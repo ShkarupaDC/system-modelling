@@ -1,0 +1,16 @@
+# IDE
+.vscode
+
+# Jupyter
+.ipynb_checkpoints
+
+# OS
+.DS_Store
+
+# Cache
+__pycache__
+
+# Env
+.venv
+
+
