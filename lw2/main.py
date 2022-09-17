@@ -6,20 +6,23 @@ from process import ProcessElement
 from model import Model
 
 
-def main() -> None:
-    process_element = ProcessElement(max_queue_size=5,
-                                     name='process1',
-                                     get_delay=partial(random.gauss, mu=1.0, sigma=0.05))
-    create_element = CreateElement(name='create1',
-                                   get_delay=partial(random.uniform, a=0.5, b=1.5),
-                                   next_elements=[process_element])
+def run_simulation() -> None:
+    create1 = CreateElement(get_delay=partial(random.uniform, a=0.2, b=0.5))
+    process1 = ProcessElement(max_queue_size=5, num_handlers=2, get_delay=partial(random.gauss, mu=1.0, sigma=0.05))
+    process2 = ProcessElement(max_queue_size=5, get_delay=partial(random.gauss, mu=1.0, sigma=0.05))
+    process3 = ProcessElement(max_queue_size=5, get_delay=partial(random.gauss, mu=1.0, sigma=0.05))
 
-    model = Model(elements=[create_element, process_element])
+    create1.add_next_element(process1)
+    process1.add_next_element(process2)
+    process2.add_next_element(process3)
+
+    model = Model(parent=create1)
     stats = model.simulate(end_time=5, verbose=True)
 
     print('Final statistics:')
-    print('\n'.join(map(str, stats)))
+    for name, element_stats in stats.items():
+        print(f'{name}:\n{element_stats}\n')
 
 
 if __name__ == '__main__':
-    main()
+    run_simulation()

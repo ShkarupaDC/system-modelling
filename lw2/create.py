@@ -1,14 +1,14 @@
+from typing import Any
+
 from element import Element
 
 
 class CreateElement(Element):
 
-    def set_current_time(self, next_time: float) -> None:
-        self.current_time = next_time
-
-    def start_action(self) -> None:
-        pass
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.next_time = self._predict_next_time()
 
     def end_action(self) -> None:
-        self._update_next_time()
+        self.next_time = self._predict_next_time()
         super().end_action()

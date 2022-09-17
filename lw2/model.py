@@ -1,36 +1,48 @@
-from element import Element
-from process import ProcessElement, ProcessStats
+from element import Element, Stats
 from common import INF_TIME
+from process import TIME_EPS
 
 
 class Model:
 
-    def __init__(self, elements: list[Element]) -> None:
-        self.elements = elements
+    def __init__(self, parent: Element) -> None:
+        self._extract_elements(parent)
 
-    def simulate(self, end_time: float, verbose: bool = False) -> list[ProcessStats]:
+    def _extract_elements(self, parent: Element) -> list[Element]:
+        elements: set[Element] = set()
+
+        def process_element(parent: Element) -> None:
+            elements.add(parent)
+            for element in parent.next_elements:
+                process_element(element)
+
+        process_element(parent)
+        self.elements = list(elements)
+
+    def simulate(self, end_time: float, verbose: bool = False) -> dict[str, Stats]:
         current_time = 0
 
         while current_time < end_time:
             next_time = INF_TIME
-            next_elements: list[Element] = []
-
             for element in self.elements:
-                if element.next_time <= next_time:
+                if element.next_time < next_time:
                     next_time = element.next_time
-                    next_elements.append(element)
-
             current_time = next_time
+
             for element in self.elements:
                 element.set_current_time(current_time)
 
-            for element in next_elements:
-                element.end_action()
+            updated_names: list[str] = []
+            for element in self.elements:
+                if abs(next_time - element.next_time) < TIME_EPS:
+                    element.end_action()
+                    updated_names.append(element.name)
 
             if verbose:
-                self._print_states(current_time)
+                self._print_states(current_time, updated_names)
 
-        return [element.stats for element in self.elements if isinstance(element, ProcessElement)]
+        return {element.name: element.stats for element in self.elements}
 
-    def _print_states(self, current_time: float) -> None:
-        print(f'{current_time:.3f}: {" | ".join([str(element) for element in self.elements])}')
+    def _print_states(self, current_time: float, updated_names: list[str]) -> None:
+        states_repr = ' | '.join([str(element) for element in self.elements])
+        print(f'{current_time:.5f}: [Updated: {updated_names}]. States: {states_repr}\n')
