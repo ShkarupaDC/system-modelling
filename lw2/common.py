@@ -1,6 +1,10 @@
 from typing import Union, TypeVar, Type, Any
 
 INF_TIME = float('inf')
+TIME_EPS = 1e-6
+
+TIME_PR = 5
+TIME_FORMATTER = f'{{value:.{TIME_PR}f}}'
 
 T = TypeVar('T')
 PathFormat = Union[str, tuple[str, str]]

@@ -1,0 +1,48 @@
+[MASTER]
+disable=
+    C0114, # missing-module-docstring
+    C0115, # missing-class-docstring
+    C0116, # missing-function-docstring
+    W0511,
+    logging-fstring-interpolation,
+    logging-format-interpolation,
+    invalid-name,
+    no-else-return,
+    protected-access,
+    misplaced-comparison-constant,
+    redefined-outer-name,
+    too-many-return-statements,
+    too-many-public-methods,
+    too-many-statements,
+    too-many-ancestors,
+    no-self-use, # disable until https://github.com/PyCQA/pylint/issues/3705 is fixed
+    duplicate-code,
+    keyword-arg-before-vararg
+
+max-line-length=150
+max-attributes=32
+max-branches=16
+max-locals=32
+max-args=16
+min-public-methods=0
+max-public-methods=25
+min-similarity-lines=6
+ignored-modules=prototypes.markup_dumper
+ignored-argument-names=arg|args|kwargs|_
+
+[MISCELLANEOUS]
+notes=FIXME,XXX
+
+[FORMAT]
+
+# Ignore long lines that contain URL
+ignore-long-lines=^\s*(# )?.*<?https?://\S+>?$|^\s*(\w*\s*=\s*)?(\"|\').*(\"|\'),?\s*$
+
+[SIMILARITIES]
+min-similarity-lines=4
+ignore-comments=yes
+ignore-docstrings=yes
+ignore-imports=yes
+
+extension-pkg-whitelist=math,orjson,cv2
+generated-members=cv2.*,pandas.*,torch.*

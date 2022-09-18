@@ -4,24 +4,28 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from element import Element, Stats
-from common import INF_TIME, format_params
-
-TIME_EPS = 1e-6
+from common import INF_TIME, TIME_EPS, TIME_PR, TIME_FORMATTER, format_params
 
 
 @dataclass(eq=False)
 class ProcessStats(Stats):
     element: 'ProcessElement'
+
     num_in_events: int = field(init=False, default=1)
     wait_time: int = field(init=False, default=0)
+    busy_time: int = field(init=False, default=0)
     num_failures: int = field(init=False, default=0)
 
     def __repr__(self) -> str:
-        return f'{super().__repr__()}. Mean queue size: {self.mean_queue_size:.5f}. Mean wait time: {self.mean_wait_time:.5f}. Failure probability: {self.failure_proba:.5f}'  # pylint: disable=line-too-long
+        return f'Num processed: {self.num_events}. Mean queue size: {self.mean_queue_size:.{TIME_PR}f}. Mean busy handlers: {self.mean_busy_handlers:.{TIME_PR}f}. Mean wait time: {self.mean_wait_time:.{TIME_PR}f}. Failure probability: {self.failure_proba:.{TIME_PR}f}'  # pylint: disable=line-too-long
 
     @property
     def mean_queue_size(self) -> float:
         return self.wait_time / max(self.element.current_time, TIME_EPS)
+
+    @property
+    def mean_busy_handlers(self) -> float:
+        return self.busy_time / max(self.element.current_time, TIME_EPS)
 
     @property
     def failure_proba(self) -> float:
@@ -38,7 +42,7 @@ class Handler:
     next_time: int
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}({format_params(self, ["in_event", ("next_time", "{value:.5f}")])})'
+        return f'{self.__class__.__name__}({format_params(self, ["in_event", ("next_time", TIME_FORMATTER)])})'
 
 
 class ProcessElement(Element):
@@ -57,7 +61,7 @@ class ProcessElement(Element):
 
     def _get_str_state(self) -> str:
         return format_params(self, [
-            'stats.num_events', ('next_time', '{value:.5f}'), 'num_handlers', 'handlers', 'queue', 'stats.num_failures'
+            'stats.num_events', ('next_time', TIME_FORMATTER), 'num_handlers', 'handlers', 'queue', 'stats.num_failures'
         ])
 
     def start_action(self) -> None:
@@ -84,5 +88,7 @@ class ProcessElement(Element):
         super().end_action()
 
     def set_current_time(self, next_time: float) -> None:
-        self.stats.wait_time += len(self.queue) * (next_time - self.current_time)
+        dtime = next_time - self.current_time
+        self.stats.wait_time += len(self.queue) * dtime
+        self.stats.busy_time += len(self.handlers) * dtime
         super().set_current_time(next_time)
