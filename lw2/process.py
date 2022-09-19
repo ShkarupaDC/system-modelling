@@ -29,7 +29,7 @@ class ProcessStats(Stats):
 
     @property
     def failure_proba(self) -> float:
-        return self.num_failures / max(self.num_events, 1)
+        return self.num_failures / max(self.num_in_events, 1)
 
     @property
     def mean_wait_time(self) -> float:

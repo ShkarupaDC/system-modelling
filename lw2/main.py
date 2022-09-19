@@ -13,8 +13,8 @@ def run_simulation() -> None:
     process3 = ProcessElement(max_queue_size=1, num_handlers=2, get_delay=partial(random.expovariate, lambd=1.0 / 1.0))
 
     create1.add_next_element(process1)
-    process1.add_next_element(process2, proba=0.7)
-    process2.add_next_element(process3, proba=0.7)
+    process1.add_next_element(process2)
+    process2.add_next_element(process3)
 
     model = Model(parent=create1)
     stats = model.simulate(end_time=1000, verbose=False)
