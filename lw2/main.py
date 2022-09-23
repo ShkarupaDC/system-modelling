@@ -15,6 +15,7 @@ def run_simulation() -> None:
     create1.add_next_element(process1)
     process1.add_next_element(process2)
     process2.add_next_element(process3)
+    process3.add_next_element(process1, proba=0.1)
 
     model = Model(parent=create1)
     stats = model.simulate(end_time=1000, verbose=False)

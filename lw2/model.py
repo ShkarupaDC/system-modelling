@@ -14,7 +14,8 @@ class Model:
         def process_element(parent: Element) -> None:
             elements.add(parent)
             for element in parent.next_elements:
-                process_element(element)
+                if element not in elements:
+                    process_element(element)
 
         process_element(parent)
         self.elements = list(elements)
