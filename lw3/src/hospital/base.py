@@ -12,4 +12,4 @@ class SickType(int, Enum):
 
 @dataclass(eq=False)
 class HospitalItem(Item):
-    sick_type: SickType
+    sick_type: SickType = SickType.FIRST

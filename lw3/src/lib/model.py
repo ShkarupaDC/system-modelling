@@ -1,15 +1,17 @@
-from typing import Generic, Any
+from typing import Generic, Any, Optional
 
 from .common import INF_TIME, TIME_EPS, T
-from .base import Node, Stats
+from .base import Node, Metrics
+from .logger import Logger
 
 
 class Model(Generic[T]):
 
-    def __init__(self, nodes: list[Node[T]]) -> None:
+    def __init__(self, nodes: list[Node[T]], logger: Logger = Logger()) -> None:
         self.nodes = nodes
+        self.logger = logger
 
-    def simulate(self, end_time: float, verbose: bool = False) -> dict[str, Stats]:
+    def simulate(self, end_time: float, verbose: bool = False) -> list[Metrics]:
         current_time = 0
         while current_time < end_time:
             # Find next closest action
@@ -17,6 +19,8 @@ class Model(Generic[T]):
             for node in self.nodes:
                 if node.next_time < next_time:
                     next_time = node.next_time
+            if next_time > end_time:
+                break
             # Move to that action
             current_time = next_time
             for node in self.nodes:
@@ -27,18 +31,19 @@ class Model(Generic[T]):
                     node.end_action()
             # Log states
             if verbose:
-                pass
-                # self.log_nodes(current_time, self.nodes)
-        nodes_stats = {node.name: node.stats for node in self.nodes}
+                self.logger.log_state(current_time, self.nodes)
+        nodes_metrics = [node.metrics for node in self.nodes]
         # Log stats
-        # self.log_stats(nodes_stats)
-        return nodes_stats
+        self.logger.log_metrics(nodes_metrics)
+        return nodes_metrics
 
     @staticmethod
     def from_factory(factory: Node[T], **kwargs: Any) -> 'Model[T]':
         nodes: set[Node[T]] = set()
 
-        def process_node(parent: Node[T]) -> None:
+        def process_node(parent: Optional[Node[T]]) -> None:
+            if parent is None:
+                return
             nodes.add(parent)
             for node in parent.connected_nodes:
                 if node not in nodes:

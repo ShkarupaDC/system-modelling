@@ -15,9 +15,9 @@ class BaseFactoryNode(Node[T]):
         raise RuntimeError('This method must not be called!')
 
 
-class FactoryItemNode(BaseFactoryNode[Item]):
+class FactoryNode(BaseFactoryNode[Item]):
 
     def end_action(self) -> Item:
         self.next_time = self._predict_next_time()
-        item = Item(id=self.stats.num_out)
+        item = Item(id=self.metrics.num_out)
         return self._end_action_hook(item)

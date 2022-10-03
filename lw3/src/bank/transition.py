@@ -19,4 +19,4 @@ class BankTransitionNode(BaseTransitionNode[T]):
         return [self.first, self.second]
 
     def _get_next_node(self, _: T) -> Optional[Node[T]]:
-        return self.first if self.first.queuelen <= self.second.queuelen else self.second_node
+        return self.first if self.first.queuelen <= self.second.queuelen else self.second

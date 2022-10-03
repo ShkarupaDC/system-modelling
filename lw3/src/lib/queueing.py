@@ -1,10 +1,12 @@
 from collections import deque
 import heapq
 from dataclasses import dataclass, field
-from typing import Optional, Generic, Any
+from typing import Optional, Generic, Type, TypeVar, Any
 
 from .common import INF_TIME, TIME_EPS, T
-from .base import Node, Stats
+from .base import Node, Metrics
+
+Q = TypeVar('Q', bound='QueueingNode')
 
 
 class Queue(Generic[T]):
@@ -73,68 +75,27 @@ class MinHeap(Generic[T]):
         return heapq.heappop(self.heap)
 
 
-@dataclass
-class Handler(Generic[T]):
-    item: T = field(compare=False)
-    next_time: float
-
-
-class QueueingNode(Node[T]):
-
-    def __init__(self, queue: Queue[T] = Queue(), max_handlers: Optional[int] = None, **kwargs: Any) -> None:
-        self.stats: QueueingStats = None
-        super().__init__(stats_type=QueueingStats, **kwargs)
-        self.queue = queue
-        self.handlers = MinHeap[Handler[T]](maxlen=max_handlers)
-
-    @property
-    def num_handlers(self) -> int:
-        return len(self.handlers)
-
-    @property
-    def queuelen(self) -> int:
-        return len(self.queue)
-
-    def start_action(self, item: T) -> None:
-        super().start_action(item)
-        if self.handlers.is_full:
-            if self.queue.is_full:
-                self.stats.num_failures += 1
-            else:
-                self.queue.push(item)
-        else:
-            handler = Handler(item=item, next_time=self._predict_next_time(item=item))
-            self.handlers.push(handler)
-            self.next_time = self.handlers.min.next_time
-
-    def end_action(self) -> None:
-        item = self.handlers.pop().item
-
-        if not self.queue.is_empty:
-            next_item = self.queue.pop()
-            handler = Handler(item=next_item, next_time=self._predict_next_time(item=next_item))
-            self.handlers.push(handler)
-
-        next_handler = self.handlers.min
-        self.next_time = INF_TIME if next_handler is None else next_handler.next_time
-        return self._end_action_hook(item)
-
-    def update_time(self, time: float) -> None:
-        dtime = time - self.current_time
-        self.stats.wait_time += self.queuelen * dtime
-        self.stats.busy_time += self.num_handlers * dtime
-        super().update_time(time)
-
-
 @dataclass(eq=False)
-class QueueingStats(Stats[QueueingNode]):
+class QueueingMetrics(Metrics[Q]):
 
-    wait_time: int = field(init=False, default=0)
-    busy_time: int = field(init=False, default=0)
+    wait_time: float = field(init=False, default=0)
+    busy_time: float = field(init=False, default=0)
+    in_time: float = field(init=False, default=0)
+    out_time: float = field(init=False, default=0)
+    in_interval: float = field(init=False, default=0)
+    out_interval: float = field(init=False, default=0)
     num_failures: int = field(init=False, default=0)
 
     @property
-    def mean_queue_len(self) -> float:
+    def mean_in_interval(self) -> float:
+        return self.in_interval / max(self.num_in - 1, 1)
+
+    @property
+    def mean_out_interval(self) -> float:
+        return self.out_interval / max(self.num_out - 1, 1)
+
+    @property
+    def mean_queuelen(self) -> float:
         return self.wait_time / max(self.node.current_time, TIME_EPS)
 
     @property
@@ -148,3 +109,74 @@ class QueueingStats(Stats[QueueingNode]):
     @property
     def mean_wait_time(self) -> float:
         return self.wait_time / max(self.num_out, 1)
+
+
+@dataclass(order=True)
+class Handler(Generic[T]):
+    item: T = field(compare=False)
+    next_time: float
+
+
+class QueueingNode(Node[T]):
+
+    def __init__(self,
+                 queue: Queue[T] = Queue(),
+                 max_handlers: Optional[int] = None,
+                 metrics_type: Type[QueueingMetrics[Q]] = QueueingMetrics,
+                 **kwargs: Any) -> None:
+        self.metrics: QueueingMetrics = None
+        super().__init__(metrics_type=metrics_type, **kwargs)
+        self.queue = queue
+        self.handlers = MinHeap[Handler[T]](maxlen=max_handlers)
+        self.next_time = INF_TIME
+
+    @property
+    def num_handlers(self) -> int:
+        return len(self.handlers)
+
+    @property
+    def queuelen(self) -> int:
+        return len(self.queue)
+
+    def start_action(self, item: T) -> None:
+        self._collect_in_metrics()
+
+        super().start_action(item)
+        if self.handlers.is_full:
+            if self.queue.is_full:
+                self.metrics.num_failures += 1
+            else:
+                self.queue.push(item)
+        else:
+            handler = Handler(item=item, next_time=self._predict_next_time(item=item))
+            self.handlers.push(handler)
+            self.next_time = self.handlers.min.next_time
+
+    def end_action(self) -> None:
+        self._collect_out_metrics()
+
+        item = self.handlers.pop().item
+        if not self.queue.is_empty:
+            next_item = self.queue.pop()
+            handler = Handler(item=next_item, next_time=self._predict_next_time(item=next_item))
+            self.handlers.push(handler)
+
+        next_handler = self.handlers.min
+        self.next_time = INF_TIME if next_handler is None else next_handler.next_time
+        return self._end_action_hook(item)
+
+    def update_time(self, time: float) -> None:
+        dtime = time - self.current_time
+        self.metrics.wait_time += self.queuelen * dtime
+        self.metrics.busy_time += self.num_handlers * dtime
+        super().update_time(time)
+
+    def _collect_out_metrics(self) -> None:
+        if self.metrics.num_out > 0:
+            self.metrics.out_interval += self.current_time - self.metrics.out_time
+        self.metrics.out_time = self.current_time
+
+    def _collect_in_metrics(self) -> None:
+        if self.metrics.num_in > 0:
+            self.metrics.out_interval += self.current_time - self.metrics.out_time
+        self.metrics.out_time = self.current_time

@@ -8,10 +8,10 @@ from ..lib.queueing import QueueingNode
 from ..lib.transition import BaseTransitionNode, ProbaTransitionNode
 
 
-class AfterTestingTransitionNode(ProbaTransitionNode[HospitalItem]):
+class TestingTransitionNode(ProbaTransitionNode[HospitalItem]):
 
     def end_action(self) -> HospitalItem:
-        next_node = self._get_next_node()
+        next_node = self._get_next_node(self.item)
         if next_node is not None:
             self.item.sick_type = SickType.FIRST
         self.set_next_node(next_node)
@@ -19,7 +19,7 @@ class AfterTestingTransitionNode(ProbaTransitionNode[HospitalItem]):
         return self._end_action_hook(self.item)
 
 
-class AfterAdmissionTransitionNode(BaseTransitionNode[HospitalItem]):
+class EmergencyTransitionNode(BaseTransitionNode[HospitalItem]):
 
     def __init__(self, chumber: QueueingNode, reception: QueueingNode, **kwargs: Any) -> None:
         super().__init__(**kwargs)
