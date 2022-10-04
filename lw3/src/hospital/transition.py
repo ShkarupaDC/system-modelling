@@ -11,12 +11,14 @@ from ..lib.transition import BaseTransitionNode, ProbaTransitionNode
 class TestingTransitionNode(ProbaTransitionNode[HospitalItem]):
 
     def end_action(self) -> HospitalItem:
-        next_node = self._get_next_node(self.item)
+        item = self.item
+        next_node = self._get_next_node(item)
         if next_node is not None:
-            self.item.sick_type = SickType.FIRST
+            item.sick_type = SickType.FIRST
         self.set_next_node(next_node)
         self.next_time = INF_TIME
-        return self._end_action_hook(self.item)
+        self.item = None
+        return self._end_action_hook(item)
 
 
 class EmergencyTransitionNode(BaseTransitionNode[HospitalItem]):

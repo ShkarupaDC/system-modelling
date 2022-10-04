@@ -9,6 +9,7 @@ class BaseFactoryNode(Node[T]):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.next_time = self._predict_next_time()
+        self.item: T = None
 
     def start_action(self, item: T) -> T:
         super().start_action(item)
@@ -19,5 +20,5 @@ class FactoryNode(BaseFactoryNode[Item]):
 
     def end_action(self) -> Item:
         self.next_time = self._predict_next_time()
-        item = Item(id=self.metrics.num_out)
-        return self._end_action_hook(item)
+        self.item = Item(id=self.metrics.num_out, created=self.current_time)
+        return self._end_action_hook(self.item)

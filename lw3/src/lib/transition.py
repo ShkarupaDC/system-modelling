@@ -13,7 +13,7 @@ class BaseTransitionNode(Node[T]):
 
     def __init__(self, delay_fn: DelayFn = lambda: 0, **kwargs: Any) -> None:
         super().__init__(delay_fn=delay_fn, **kwargs)
-        self.item: T = None
+        self.item: Optional[T] = None
         self.next_time = INF_TIME
 
     def start_action(self, item: T) -> None:
@@ -22,9 +22,11 @@ class BaseTransitionNode(Node[T]):
         self.next_time = self._predict_next_time()
 
     def end_action(self) -> T:
-        self.set_next_node(self._get_next_node(self.item))
+        item = self.item
+        self.set_next_node(self._get_next_node(item))
         self.next_time = INF_TIME
-        return self._end_action_hook(self.item)
+        self.item = None
+        return self._end_action_hook(item)
 
     @abstractmethod
     def _get_next_node(self, _: T) -> Optional[Node[T]]:

@@ -24,7 +24,9 @@ class ActionRecord:
 @dataclass(eq=False)
 class Item:
     id: int = 0
-    history: list[ActionRecord] = field(repr=False, default_factory=list)
+    created: float = field(repr=False, default=0)
+    processed: bool = field(init=False, repr=False, default=False)
+    history: list[ActionRecord] = field(init=False, repr=False, default_factory=list)
 
 
 @dataclass(eq=False)
@@ -44,6 +46,7 @@ class Node(ABC, Generic[T]):
                  metrics_type: Type[Metrics['Node[T]']] = Metrics) -> None:
         self.num_nodes += 1
         self.delay_fn = delay_fn
+        self.delay_params = inspect.signature(self.delay_fn).parameters
         self.name = self._get_auto_name() if name is None else name
         self.next_node = next_node
         self.metrics = metrics_type(self)
@@ -76,10 +79,7 @@ class Node(ABC, Generic[T]):
         return f'{self.__class__.__name__}{self.num_nodes}'
 
     def _predict_next_time(self, **kwargs: Any) -> float:
-        if inspect.signature(self.delay_fn).parameters:
-            delay = self.delay_fn(**kwargs)
-        else:
-            delay = self.delay_fn()
+        delay = self.delay_fn(**{name: value for name, value in kwargs.items() if name in self.delay_params})
         return self.current_time + delay
 
     def _end_action_hook(self, item: T) -> T:
@@ -92,3 +92,5 @@ class Node(ABC, Generic[T]):
     def _start_next_action(self, item: T) -> None:
         if self.next_node is not None:
             self.next_node.start_action(item)
+        elif isinstance(item, Item):
+            item.processed = True

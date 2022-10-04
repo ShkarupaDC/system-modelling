@@ -9,6 +9,9 @@ class SickType(int, Enum):
     SECOND = 2
     THIRD = 3
 
+    def __repr__(self) -> str:
+        return str(self.value)
+
 
 @dataclass(eq=False)
 class HospitalItem(Item):
