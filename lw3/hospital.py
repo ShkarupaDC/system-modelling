@@ -37,11 +37,11 @@ def run_simulation() -> None:
     at_emergency.set_next_node(emergency_transition)
     to_reception.set_next_node(at_reception)
     at_reception.set_next_node(on_testing)
-    testing_transition = TestingTransitionNode(name='8. After Testing', nodes_probas={at_emergency: 0})
+    testing_transition = TestingTransitionNode(name='8. After Testing', nodes_probas={at_emergency: 0.2})
     on_testing.set_next_node(testing_transition)
 
     model = Model.from_factory(incoming_sick_people, logger=HospitalLogger())
-    model.simulate(end_time=100, verbose=True)
+    model.simulate(end_time=10000, verbose=False)
 
 
 if __name__ == '__main__':

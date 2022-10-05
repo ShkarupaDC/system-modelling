@@ -110,6 +110,10 @@ class QueueingMetrics(Metrics[Q]):
     def mean_wait_time(self) -> float:
         return self.wait_time / max(self.num_out, 1)
 
+    @property
+    def mean_busy_time(self) -> float:
+        return self.busy_time / max(self.num_out, 1)
+
 
 @dataclass(order=True)
 class Handler(Generic[T]):
@@ -178,5 +182,5 @@ class QueueingNode(Node[T]):
 
     def _collect_in_metrics(self) -> None:
         if self.metrics.num_in > 0:
-            self.metrics.out_interval += self.current_time - self.metrics.out_time
-        self.metrics.out_time = self.current_time
+            self.metrics.in_interval += self.current_time - self.metrics.in_time
+        self.metrics.in_time = self.current_time

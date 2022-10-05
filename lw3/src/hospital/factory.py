@@ -1,20 +1,22 @@
 import random
-from dataclasses import dataclass, field
-from typing import Any, Type
+from dataclasses import dataclass
+from typing import Type, Any
 
-from ..lib.base import Metrics
-from ..lib.factory import BaseFactoryNode
+from ..lib.factory import BaseFactoryNode, FactoryMetrics
 
 from .base import HospitalItem, SickType
+from .utils import MeanMeter
 
 
 @dataclass(eq=False)
-class HospitalFactoryMetrics(Metrics[HospitalItem]):
-    items: list[HospitalItem] = field(init=False, default_factory=list)
+class HospitalFactoryMetrics(FactoryMetrics[HospitalItem]):
 
     @property
-    def total_time(self) -> dict[HospitalItem, float]:
-        return {item: item.history[-1].time - item.history[0].time for item in self.items if item.processed}
+    def mean_time_per_type(self) -> dict[SickType, float]:
+        meters = {name: MeanMeter() for name in SickType}
+        for sick, time in self.time_per_item.items():
+            meters[sick.sick_type].update(time)
+        return {name: meter.mean for name, meter in meters.items()}
 
 
 class HospitalFactoryNode(BaseFactoryNode[HospitalItem]):

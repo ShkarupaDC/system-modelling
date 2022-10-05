@@ -1,5 +1,6 @@
 from ..lib.common import T
 from ..lib.base import Node, Metrics
+from ..lib.factory import FactoryMetrics
 from ..lib.logger import NodeLoggerDispatcher, MetricLoggerDispatcher, Logger
 
 from .queueing import BQ, BankQueueingMetrics
@@ -18,6 +19,10 @@ class BankLogger(Logger[T]):
         return (f'{self.queueing_metrics(metrics)}. '
                 f'Num switched from neighbor checkout: {metrics.num_from_neighbor}')
 
+    def factory_metrics(self, metrics: FactoryMetrics[T]) -> str:
+        return (f'{self.node_metrics(metrics)}. '
+                f'Mean time in system: {metrics.mean_time:.{self.precision}f}')
+
     def get_node_logger(self, node: Node[T]) -> NodeLoggerDispatcher:
         if isinstance(node, BankTransitionNode):
             return self.bank_transition_node
@@ -26,4 +31,6 @@ class BankLogger(Logger[T]):
     def get_metrics_logger(self, metrics: Metrics[Node[T]]) -> MetricLoggerDispatcher:
         if isinstance(metrics, BankQueueingMetrics):
             return self.bank_queueing_metrics
+        if isinstance(metrics, FactoryMetrics):
+            return self.factory_metrics
         return super().get_metrics_logger(metrics)

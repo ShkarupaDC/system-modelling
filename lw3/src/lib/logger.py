@@ -49,12 +49,13 @@ class Logger(Generic[T]):
             f'num_failures={node.metrics.num_failures}')
 
     def queueing_metrics(self, metrics: QueueingMetrics[T]) -> str:
-        return (f'Num processed: {metrics.num_out}. '
+        return (f'{self.node_metrics(metrics)}. '
                 f'Mean interval between input actions: {metrics.mean_in_interval:.{self.precision}f}. '
                 f'Mean interval between output actions: {metrics.mean_out_interval:.{self.precision}f}. '
                 f'Mean queue size: {metrics.mean_queuelen:.{self.precision}f}. '
                 f'Mean busy handlers: {metrics.mean_busy_handlers:.{self.precision}f}. '
                 f'Mean wait time: {metrics.mean_wait_time:.{self.precision}f}. '
+                f'Mean processing time: {metrics.mean_busy_time:.{self.precision}f}. '
                 f'Failure probability: {metrics.failure_proba:.{self.precision}f}')
 
     def base_transition_node(self, node: BaseTransitionNode[T]) -> str:

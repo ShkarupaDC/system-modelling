@@ -25,7 +25,7 @@ def run_simulation() -> None:
     transition = BankTransitionNode[Item](name='2. First vs Second', first=first_checkout, second=second_checkout)
     incoming_cars.set_next_node(transition)
     model = Model.from_factory(incoming_cars, logger=BankLogger())
-    model.simulate(end_time=10, verbose=True)
+    model.simulate(end_time=1000, verbose=False)
 
 
 if __name__ == '__main__':
