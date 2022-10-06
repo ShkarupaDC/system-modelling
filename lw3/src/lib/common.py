@@ -8,8 +8,8 @@ TIME_EPS = 1e-6
 T = TypeVar('T')
 
 
-def erlang(mean: float, k: int) -> float:
+def erlang(lambd: float, k: int) -> float:
     product = 1
     for _ in range(k):
         product *= random.random()
-    return -1 / (k * mean) * math.log(product)
+    return -1 / lambd * math.log(product)

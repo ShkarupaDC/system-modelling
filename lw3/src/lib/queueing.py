@@ -143,8 +143,6 @@ class QueueingNode(Node[T]):
         return len(self.queue)
 
     def start_action(self, item: T) -> None:
-        self._collect_in_metrics()
-
         super().start_action(item)
         if self.handlers.is_full:
             if self.queue.is_full:
@@ -157,8 +155,6 @@ class QueueingNode(Node[T]):
             self.next_time = self.handlers.min.next_time
 
     def end_action(self) -> None:
-        self._collect_out_metrics()
-
         item = self.handlers.pop().item
         if not self.queue.is_empty:
             next_item = self.queue.pop()
@@ -175,12 +171,14 @@ class QueueingNode(Node[T]):
         self.metrics.busy_time += self.num_handlers * dtime
         super().update_time(time)
 
-    def _collect_out_metrics(self) -> None:
-        if self.metrics.num_out > 0:
+    def _out_metrics_hook(self) -> None:
+        super()._out_metrics_hook()
+        if self.metrics.num_out > 1:
             self.metrics.out_interval += self.current_time - self.metrics.out_time
         self.metrics.out_time = self.current_time
 
-    def _collect_in_metrics(self) -> None:
-        if self.metrics.num_in > 0:
+    def _in_metrics_hook(self) -> None:
+        super()._in_metrics_hook()
+        if self.metrics.num_in > 1:
             self.metrics.in_interval += self.current_time - self.metrics.in_time
         self.metrics.in_time = self.current_time

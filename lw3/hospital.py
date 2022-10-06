@@ -26,8 +26,10 @@ def run_simulation() -> None:
                                             max_handlers=3,
                                             delay_fn=partial(random.uniform, a=3, b=8))
     to_reception = QueueingNode[HospitalItem](name='5. To reception', delay_fn=partial(random.uniform, a=2, b=5))
-    at_reception = QueueingNode[HospitalItem](name='6. At reception', delay_fn=partial(erlang, mean=4.5, k=3))
-    on_testing = QueueingNode[HospitalItem](name='7. On Testing', max_handlers=2, delay_fn=partial(erlang, mean=4, k=2))
+    at_reception = QueueingNode[HospitalItem](name='6. At reception', delay_fn=partial(erlang, lambd=3 / 4.5, k=3))
+    on_testing = QueueingNode[HospitalItem](name='7. On Testing',
+                                            max_handlers=2,
+                                            delay_fn=partial(erlang, lambd=2 / 4, k=2))
 
     # Connections
     incoming_sick_people.set_next_node(at_emergency)
@@ -41,7 +43,7 @@ def run_simulation() -> None:
     on_testing.set_next_node(testing_transition)
 
     model = Model.from_factory(incoming_sick_people, logger=HospitalLogger())
-    model.simulate(end_time=10000, verbose=False)
+    model.simulate(end_time=100000, verbose=False)
 
 
 if __name__ == '__main__':

@@ -1,13 +1,21 @@
-from typing import Callable, Generic
+from __future__ import annotations
+from typing import Callable, Generic, TYPE_CHECKING
 
 from .common import T
 from .base import Item, Node, Metrics
-from .factory import BaseFactoryNode
+from .factory import BaseFactoryNode, FactoryMetrics
 from .queueing import Handler, MinHeap, Queue, QueueingNode, QueueingMetrics
 from .transition import BaseTransitionNode
 
+if TYPE_CHECKING:
+    from .model import ModelMetricReport
+
 NodeLoggerDispatcher = Callable[[Node[T]], str]
 MetricLoggerDispatcher = Callable[[Metrics[Node[T]]], str]
+
+
+def _format_float(value: float, precision: str = 3) -> str:
+    return f'{value:.{precision}f}'
 
 
 class Logger(Generic[T]):
@@ -15,23 +23,30 @@ class Logger(Generic[T]):
     def __init__(self, precision: int = 3) -> None:
         self.precision = precision
 
+    def float(self, value: float) -> str:
+        return _format_float(value, self.precision)
+
     def _base_node(self, node: Node[T], addon: str) -> str:
         return f'{node.name}({addon})'
 
     def node(self, node: Node[T]) -> str:
-        return self._base_node(node, f'next_time={node.next_time:.{self.precision}f}')
+        return self._base_node(node, f'next_time={self.float(node.next_time)}')
 
     def node_metrics(self, metrics: Metrics[Node[T]]) -> str:
         return f'Num in items: {metrics.num_in}. Num out items: {metrics.num_out}'
 
     def base_factory_node(self, node: BaseFactoryNode[T]) -> str:
         return self._base_node(
-            node, f'next_time={node.next_time:.{self.precision}f}, '
+            node, f'next_time={self.float(node.next_time)}, '
             f'item={node.item}, '
-            f'created={node.item.created:.{self.precision}f}' if isinstance(node.item, Item) else '')
+            f'created={self.float(node.item.created)}' if isinstance(node.item, Item) else '')
+
+    def factory_metrics(self, metrics: FactoryMetrics[T]) -> str:
+        return (f'{self.node_metrics(metrics)}. '
+                f'Mean time in system: {self.float(metrics.mean_time)}')
 
     def handler(self, handler: Handler) -> str:
-        return f'Handler(item={handler.item}, next_time={handler.next_time:.{self.precision}f})'
+        return f'Handler(item={handler.item}, next_time={self.float(handler.next_time)})'
 
     def handlers(self, handlers: MinHeap[Handler]) -> str:
         return ('Handlers('
@@ -43,20 +58,20 @@ class Logger(Generic[T]):
 
     def queueing_node(self, node: QueueingNode[T]) -> str:
         return self._base_node(
-            node, f'next_time={node.next_time:.{self.precision}f}, '
+            node, f'next_time={self.float(node.next_time)}, '
             f'handlers={self.handlers(node.handlers)}, '
             f'queue={self.queue(node.queue)}, '
             f'num_failures={node.metrics.num_failures}')
 
     def queueing_metrics(self, metrics: QueueingMetrics[T]) -> str:
         return (f'{self.node_metrics(metrics)}. '
-                f'Mean interval between input actions: {metrics.mean_in_interval:.{self.precision}f}. '
-                f'Mean interval between output actions: {metrics.mean_out_interval:.{self.precision}f}. '
-                f'Mean queue size: {metrics.mean_queuelen:.{self.precision}f}. '
-                f'Mean busy handlers: {metrics.mean_busy_handlers:.{self.precision}f}. '
-                f'Mean wait time: {metrics.mean_wait_time:.{self.precision}f}. '
-                f'Mean processing time: {metrics.mean_busy_time:.{self.precision}f}. '
-                f'Failure probability: {metrics.failure_proba:.{self.precision}f}')
+                f'Mean interval between input actions: {self.float(metrics.mean_in_interval)}. '
+                f'Mean interval between output actions: {self.float(metrics.mean_out_interval)}. '
+                f'Mean queue size: {self.float(metrics.mean_queuelen)}. '
+                f'Mean busy handlers: {self.float(metrics.mean_busy_handlers)}. '
+                f'Mean wait time: {self.float(metrics.mean_wait_time)}. '
+                f'Mean processing time: {self.float(metrics.mean_busy_time)}. '
+                f'Failure probability: {self.float(metrics.failure_proba)}')
 
     def base_transition_node(self, node: BaseTransitionNode[T]) -> str:
         return self._base_node(node, f'item={node.item}, '
@@ -76,18 +91,25 @@ class Logger(Generic[T]):
     def get_metrics_logger(self, metrics: Metrics[Node[T]]) -> MetricLoggerDispatcher:
         if isinstance(metrics, QueueingMetrics):
             return self.queueing_metrics
+        if isinstance(metrics, FactoryMetrics):
+            return self.factory_metrics
         if isinstance(metrics, Metrics):
             return self.node_metrics
         raise RuntimeError(f'{type(metrics)} must be inherited from "Metrics"')
 
     def log_state(self, time: float, nodes: list[Node[T]], updated_nodes: list[Node[T]]) -> None:
         print('-------------------------------State-------------------------------')
-        updated = [node.name for node in sorted(updated_nodes, key=lambda node: node.name)]
-        print(f'{time:.{self.precision}f}. Happened: {updated}. After:')
-        print('\n'.join(self.get_node_logger(node)(node) for node in sorted(nodes, key=lambda node: node.name)))
+        if nodes:
+            updated = [node.name for node in sorted(updated_nodes, key=lambda node: node.name)]
+            print(f'{self.float(time)}. Happened: {updated}. After:')
+            print('\n'.join(self.get_node_logger(node)(node) for node in sorted(nodes, key=lambda node: node.name)))
 
-    def log_metrics(self, nodes_metrics: list[Metrics[Node[T]]]) -> None:
+    def log_metrics(self, model_metrics: list[ModelMetricReport], nodes_metrics: list[Metrics[Node[T]]]) -> None:
         print('------------------------------Metrics------------------------------')
-        sorted_metrics = sorted(nodes_metrics, key=lambda metrics: metrics.node.name)
-        print('\n--------------------------\n'.join(f'{metrics.node.name}:\n{self.get_metrics_logger(metrics)(metrics)}'
-                                                    for metrics in sorted_metrics))
+        if nodes_metrics:
+            sorted_metrics = sorted(nodes_metrics, key=lambda metrics: metrics.node.name)
+            print('\n--------------------------\n'.join(
+                f'{metrics.node.name}:\n{self.get_metrics_logger(metrics)(metrics)}' for metrics in sorted_metrics))
+        if model_metrics:
+            print('--------------------------\nModel metrics:')
+            print('. '.join(f'{metric.name}: {metric.report}' for metric in model_metrics))

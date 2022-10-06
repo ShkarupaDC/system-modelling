@@ -59,9 +59,9 @@ class Node(ABC, Generic[T]):
         return [self.next_node]
 
     def start_action(self, item: T) -> None:
+        self._in_metrics_hook()
         if isinstance(item, Item):
             item.history.append(ActionRecord(self.name, ActionType.IN, self.current_time))
-        self.metrics.num_in += 1
 
     @abstractmethod
     def end_action(self) -> T:
@@ -82,15 +82,22 @@ class Node(ABC, Generic[T]):
         delay = self.delay_fn(**{name: value for name, value in kwargs.items() if name in self.delay_params})
         return self.current_time + delay
 
+    def _in_metrics_hook(self) -> None:
+        self.metrics.num_in += 1
+
+    def _out_metrics_hook(self) -> None:
+        self.metrics.num_out += 1
+
     def _end_action_hook(self, item: T) -> T:
+        self._out_metrics_hook()
         if isinstance(item, Item):
             item.history.append(ActionRecord(self.name, ActionType.OUT, self.current_time))
-        self.metrics.num_out += 1
         self._start_next_action(item)
         return item
 
     def _start_next_action(self, item: T) -> None:
         if self.next_node is not None:
             self.next_node.start_action(item)
-        elif isinstance(item, Item):
-            item.processed = True
+        else:
+            if isinstance(item, Item):
+                item.processed = True
