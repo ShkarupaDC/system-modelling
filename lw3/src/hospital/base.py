@@ -1,5 +1,5 @@
 from enum import Enum
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from ..lib.base import Item
 
@@ -16,3 +16,4 @@ class SickType(int, Enum):
 @dataclass(eq=False)
 class HospitalItem(Item):
     sick_type: SickType = SickType.FIRST
+    as_first_sick: bool = field(repr=False, default=False)
