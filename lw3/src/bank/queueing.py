@@ -33,6 +33,6 @@ class BankQueueingNode(QueueingNode[T]):
         while self.neighbor.queuelen - self.queuelen >= self.min_diff:
             last_item = self.neighbor.queue.pop()
             self.queue.push(last_item)
-            self.neighbor._in_metrics_hook()
+            self.neighbor._item_in_hook()
             self.metrics.num_from_neighbor += 1
         return item

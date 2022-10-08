@@ -1,13 +1,16 @@
-from dataclasses import dataclass
-from typing import Callable, Generic, Optional, Any
+from enum import Flag, auto
+from dataclasses import dataclass, field
+from typing import Callable, Generic, Optional, Type, Any
 
 from .common import INF_TIME, TIME_EPS, T
 from .base import Node, Metrics
+from .factory import BaseFactoryNode
+from .queueing import QueueingNode
 from .logger import Logger
 
 
 @dataclass(eq=False)
-class ModelMetricReport(Generic[T]):
+class EvaluationReport(Generic[T]):
     name: str
     result: T
     serialize: Callable[[T], str]
@@ -18,26 +21,55 @@ class ModelMetricReport(Generic[T]):
 
 
 @dataclass(eq=False)
-class ModelMetric(Generic[T]):
+class Evaluation(Generic[T]):
     name: str
     evaluate: Callable[['Model'], T]
     serialize: Callable[[T], str] = str
 
-    def __call__(self, model: 'Model') -> ModelMetricReport[T]:
-        return ModelMetricReport[T](name=self.name, result=self.evaluate(model), serialize=self.serialize)
+    def __call__(self, model: 'Model') -> EvaluationReport[T]:
+        return EvaluationReport[T](name=self.name, result=self.evaluate(model), serialize=self.serialize)
+
+
+@dataclass(eq=False)
+class ModelMetrics(Generic[T]):
+    model: T
+    num_events: int = field(init=False, default=0)
+    simulation_time: float = field(init=False, default=0)
+
+    @property
+    def mean_event_intensity(self) -> float:
+        return self.num_events / max(self.simulation_time, TIME_EPS)
+
+    def reset(self) -> None:
+        self.num_events = 0
+        self.simulation_time = 0
+
+
+class Verbosity(Flag):
+    NONE = auto()
+    STATE = auto()
+    METRICS = auto()
+
+
+ModellingMetrics = tuple[ModelMetrics, list[EvaluationReport], list[Metrics]]
 
 
 class Model(Generic[T]):
 
-    def __init__(self,
-                 nodes: list[Node[T]],
-                 logger: Logger = Logger(),
-                 model_metrics: Optional[list[ModelMetric]] = None) -> None:
+    def __init__(
+            self,
+            nodes: list[Node[T]],
+            metrics_type: Type[ModelMetrics] = ModelMetrics,
+            evaluations: Optional[list[Evaluation]] = None,
+            logger: Logger = Logger(),
+    ) -> None:
         self.nodes = nodes
         self.logger = logger
-        self.model_metrics = [] if model_metrics is None else model_metrics
+        self.metrics = metrics_type[Model[T]](self)
+        self.evaluations = [] if evaluations is None else evaluations
 
-    def simulate(self, end_time: float, verbose: bool = False) -> tuple[list[ModelMetricReport], list[Metrics]]:
+    def simulate(self, end_time: float, verbosity: Verbosity = Verbosity.METRICS) -> ModellingMetrics:
+        self.metrics.reset()
         current_time = 0
         while current_time < end_time:
             # Find next closest action
@@ -54,17 +86,23 @@ class Model(Generic[T]):
             # Run actions
             updated_nodes: list[Node[T]] = []
             for node in self.nodes:
-                if abs(next_time - node.next_time) < TIME_EPS:
-                    updated_nodes.append(node)
-                    node.end_action()
+                if abs(next_time - node.next_time) > TIME_EPS:
+                    continue
+                updated_nodes.append(node)
+                node.end_action()
+                if isinstance(node, (BaseFactoryNode, QueueingNode)):
+                    self.metrics.num_events += 1
             # Log states
-            if verbose:
+            if Verbosity.STATE in verbosity:
                 self.logger.log_state(current_time, self.nodes, updated_nodes)
-        nodes_metrics = [node.metrics for node in self.nodes]
-        model_metrics = [metric(self) for metric in self.model_metrics]
-        # Log stats
-        self.logger.log_metrics(model_metrics, nodes_metrics)
-        return model_metrics, nodes_metrics
+        self.metrics.simulation_time = current_time
+
+        modelling_metrics = self.metrics, [node.metrics for node in self.nodes
+                                           ], [evaluation(self) for evaluation in self.evaluations]
+        # Log metrics
+        if Verbosity.METRICS in verbosity:
+            self.logger.log_metrics(*modelling_metrics)
+        return modelling_metrics
 
     @staticmethod
     def from_factory(factory: Node[T], **kwargs: Any) -> 'Model[T]':

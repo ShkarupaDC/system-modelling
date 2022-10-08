@@ -59,7 +59,7 @@ class Node(ABC, Generic[T]):
         return [self.next_node]
 
     def start_action(self, item: T) -> None:
-        self._in_metrics_hook()
+        self._item_in_hook()
         if isinstance(item, Item):
             item.history.append(ActionRecord(self.name, ActionType.IN, self.current_time))
 
@@ -68,6 +68,7 @@ class Node(ABC, Generic[T]):
         raise NotImplementedError
 
     def update_time(self, time: float) -> None:
+        self._before_time_update_hook(time)
         self.current_time = time
 
     def set_next_node(self, node: 'Node[T]') -> None:
@@ -82,14 +83,8 @@ class Node(ABC, Generic[T]):
         delay = self.delay_fn(**{name: value for name, value in kwargs.items() if name in self.delay_params})
         return self.current_time + delay
 
-    def _in_metrics_hook(self) -> None:
-        self.metrics.num_in += 1
-
-    def _out_metrics_hook(self) -> None:
-        self.metrics.num_out += 1
-
-    def _end_action_hook(self, item: T) -> T:
-        self._out_metrics_hook()
+    def _end_action(self, item: T) -> T:
+        self._item_out_hook()
         if isinstance(item, Item):
             item.history.append(ActionRecord(self.name, ActionType.OUT, self.current_time))
         self._start_next_action(item)
@@ -101,3 +96,12 @@ class Node(ABC, Generic[T]):
         else:
             if isinstance(item, Item):
                 item.processed = True
+
+    def _item_in_hook(self) -> None:
+        self.metrics.num_in += 1
+
+    def _item_out_hook(self) -> None:
+        self.metrics.num_out += 1
+
+    def _before_time_update_hook(self, _: float) -> None:
+        pass

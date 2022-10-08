@@ -4,7 +4,7 @@ from functools import partial
 from src.lib.base import Item
 from src.lib.queueing import Queue
 from src.lib.factory import FactoryNode
-from src.lib.model import Model, ModelMetric
+from src.lib.model import Model, Evaluation
 from src.lib.logger import _format_float
 
 from src.bank import BankQueueingNode, BankTransitionNode, BankLogger
@@ -40,17 +40,17 @@ def run_simulation() -> None:
         return metrics1.mean_busy_handlers + metrics1.mean_queuelen + metrics2.mean_busy_handlers + metrics2.mean_queuelen
 
     model = Model.from_factory(incoming_cars,
-                               logger=BankLogger(),
-                               model_metrics=[
-                                   ModelMetric[float](name='Total failure proba',
-                                                      evaluate=total_failure_proba,
-                                                      serialize=_format_float),
-                                   ModelMetric[float](name='Mean number of cars in bank',
-                                                      evaluate=mean_cars_in_bank,
-                                                      serialize=_format_float),
-                                   ModelMetric[int](name='Num switched checkout', evaluate=num_switched_checkout)
-                               ])
-    model.simulate(end_time=10000, verbose=False)
+                               evaluations=[
+                                   Evaluation[float](name='Total failure proba',
+                                                     evaluate=total_failure_proba,
+                                                     serialize=_format_float),
+                                   Evaluation[float](name='Mean number of cars in bank',
+                                                     evaluate=mean_cars_in_bank,
+                                                     serialize=_format_float),
+                                   Evaluation[int](name='Num switched checkout', evaluate=num_switched_checkout)
+                               ],
+                               logger=BankLogger())
+    model.simulate(end_time=10000)
 
 
 if __name__ == '__main__':

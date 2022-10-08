@@ -18,7 +18,7 @@ class TestingTransitionNode(ProbaTransitionNode[HospitalItem]):
         self.set_next_node(next_node)
         self.next_time = INF_TIME
         self.item = None
-        return self._end_action_hook(item)
+        return self._end_action(item)
 
 
 class EmergencyTransitionNode(BaseTransitionNode[HospitalItem]):

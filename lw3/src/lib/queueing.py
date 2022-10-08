@@ -146,11 +146,12 @@ class QueueingNode(Node[T]):
         super().start_action(item)
         if self.handlers.is_full:
             if self.queue.is_full:
-                self.metrics.num_failures += 1
+                self._failure_hook()
             else:
                 self.queue.push(item)
         else:
             handler = Handler(item=item, next_time=self._predict_next_time(item=item))
+            self._before_add_handler_hook()
             self.handlers.push(handler)
             self.next_time = self.handlers.min.next_time
 
@@ -159,26 +160,32 @@ class QueueingNode(Node[T]):
         if not self.queue.is_empty:
             next_item = self.queue.pop()
             handler = Handler(item=next_item, next_time=self._predict_next_time(item=next_item))
+            self._before_add_handler_hook()
             self.handlers.push(handler)
 
         next_handler = self.handlers.min
         self.next_time = INF_TIME if next_handler is None else next_handler.next_time
-        return self._end_action_hook(item)
+        return self._end_action(item)
 
-    def update_time(self, time: float) -> None:
+    def _before_time_update_hook(self, time: float) -> None:
         dtime = time - self.current_time
         self.metrics.wait_time += self.queuelen * dtime
         self.metrics.busy_time += self.num_handlers * dtime
-        super().update_time(time)
 
-    def _out_metrics_hook(self) -> None:
-        super()._out_metrics_hook()
+    def _item_out_hook(self) -> None:
+        super()._item_out_hook()
         if self.metrics.num_out > 1:
             self.metrics.out_interval += self.current_time - self.metrics.out_time
         self.metrics.out_time = self.current_time
 
-    def _in_metrics_hook(self) -> None:
-        super()._in_metrics_hook()
+    def _item_in_hook(self) -> None:
+        super()._item_in_hook()
         if self.metrics.num_in > 1:
             self.metrics.in_interval += self.current_time - self.metrics.in_time
         self.metrics.in_time = self.current_time
+
+    def _before_add_handler_hook(self) -> None:
+        pass
+
+    def _failure_hook(self) -> None:
+        self.metrics.num_failures += 1

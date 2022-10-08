@@ -43,7 +43,7 @@ def run_simulation() -> None:
     on_testing.set_next_node(testing_transition)
 
     model = Model.from_factory(incoming_sick_people, logger=HospitalLogger())
-    model.simulate(end_time=100000, verbose=False)
+    model.simulate(end_time=100000)
 
 
 if __name__ == '__main__':

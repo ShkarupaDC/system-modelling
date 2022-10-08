@@ -26,7 +26,7 @@ class BaseTransitionNode(Node[T]):
         self.set_next_node(self._get_next_node(item))
         self.next_time = INF_TIME
         self.item = None
-        return self._end_action_hook(item)
+        return self._end_action(item)
 
     @abstractmethod
     def _get_next_node(self, _: T) -> Optional[Node[T]]:
@@ -39,6 +39,13 @@ class ProbaTransitionNode(BaseTransitionNode[T]):
         super().__init__(**kwargs)
         self.next_nodes, self.next_probas = self._process_input(nodes_probas)
 
+    @property
+    def connected_nodes(self) -> Iterable['Node[T]']:
+        return self.next_nodes
+
+    def _get_next_node(self, _: T) -> Optional[Node[T]]:
+        return random.choices(self.next_nodes, self.next_probas, k=1)[0]
+
     @staticmethod
     def _process_input(nodes_probas: NodesProbes) -> NodesAndProbes:
         proba_sum = sum(nodes_probas.values())
@@ -47,10 +54,3 @@ class ProbaTransitionNode(BaseTransitionNode[T]):
         if proba_sum < 1:
             nodes_probas[None] = 1 - proba_sum
         return zip(*nodes_probas.items())
-
-    @property
-    def connected_nodes(self) -> Iterable['Node[T]']:
-        return self.next_nodes
-
-    def _get_next_node(self, _: T) -> Optional[Node[T]]:
-        return random.choices(self.next_nodes, self.next_probas, k=1)[0]

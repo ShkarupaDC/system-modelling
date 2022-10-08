@@ -50,4 +50,4 @@ class FactoryNode(BaseFactoryNode[Item]):
         self.next_time = self._predict_next_time()
         self.item = Item(id=self.metrics.num_out, created=self.current_time)
         self.metrics.items.append(self.item)
-        return self._end_action_hook(self.item)
+        return self._end_action(self.item)
