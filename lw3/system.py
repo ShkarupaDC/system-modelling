@@ -7,6 +7,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Type, Any
 
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
@@ -41,7 +42,7 @@ def create_model(num_nodes: int, factory_time: float, queueing_time: float, prev
                           delay_fn=partial(random.expovariate, lambd=1.0 / factory_time))
     prev_node: Node[Item] = factory
 
-    node_idx = 0
+    node_idx = 2
     for idx in range(num_nodes):
         node = SystemQueueingNode(name=f'{node_idx:0{num_digits}d}. Queueing',
                                   max_handlers=1,
@@ -106,10 +107,17 @@ if __name__ == '__main__':
     simulation_times = [1e3, 2e3, 3e3, 4e3, 5e3, 6e3, 7e3, 8e3, 9e3, 1e4]
 
     # Time complexity estimation
-    measured_times, predicted_times = zip(*[
-        run_simulation(model=create_model(
-            num_nodes=num_nodes, factory_time=factory_time, queueing_time=queueing_time, prev_proba=prev_proba),
-                       simulation_time=simulation_time) for simulation_time in simulation_times
-    ])
+    model = create_model(num_nodes=num_nodes,
+                         factory_time=factory_time,
+                         queueing_time=queueing_time,
+                         prev_proba=prev_proba)
+
+    measured_times, predicted_times = [], []
+
+    for simulation_time in tqdm(simulation_times, desc='Simulations'):
+        measured_time, predicted_time = run_simulation(model=model, simulation_time=simulation_time)
+        measured_times.append(measured_time)
+        predicted_times.append(predicted_time)
+
     figure = get_time_complexity_plot(simulation_times, measured_times, predicted_times)
     figure.savefig(save_path, dpi=300)

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Generic, Type, TypeVar, Any
 
 from .common import INF_TIME, TIME_EPS, T
-from .base import Node, Metrics
+from .base import Node, NodeMetrics
 
 Q = TypeVar('Q', bound='QueueingNode')
 
@@ -32,6 +32,9 @@ class Queue(Generic[T]):
     @property
     def is_full(self) -> bool:
         return self.bounded and len(self) == self.maxlen
+
+    def clear(self) -> None:
+        self.queue.clear()
 
     def push(self, item: T) -> None:
         self.queue.append(item)
@@ -66,6 +69,9 @@ class MinHeap(Generic[T]):
     def min(self) -> Optional[T]:
         return None if self.is_empty else self.heap[0]
 
+    def clear(self) -> None:
+        self.heap.clear()
+
     def push(self, item: T) -> Optional[T]:
         if self.is_full:
             return heapq.heapreplace(self.heap, item)
@@ -76,7 +82,7 @@ class MinHeap(Generic[T]):
 
 
 @dataclass(eq=False)
-class QueueingMetrics(Metrics[Q]):
+class QueueingMetrics(NodeMetrics[Q]):
 
     wait_time: float = field(init=False, default=0)
     busy_time: float = field(init=False, default=0)
@@ -96,11 +102,11 @@ class QueueingMetrics(Metrics[Q]):
 
     @property
     def mean_queuelen(self) -> float:
-        return self.wait_time / max(self.node.current_time, TIME_EPS)
+        return self.wait_time / max(self.parent.current_time, TIME_EPS)
 
     @property
     def mean_busy_handlers(self) -> float:
-        return self.busy_time / max(self.node.current_time, TIME_EPS)
+        return self.busy_time / max(self.parent.current_time, TIME_EPS)
 
     @property
     def failure_proba(self) -> float:
@@ -166,6 +172,12 @@ class QueueingNode(Node[T]):
         next_handler = self.handlers.min
         self.next_time = INF_TIME if next_handler is None else next_handler.next_time
         return self._end_action(item)
+
+    def reset(self) -> None:
+        super().reset()
+        self.next_time = INF_TIME
+        self.queue.clear()
+        self.handlers.clear()
 
     def _before_time_update_hook(self, time: float) -> None:
         dtime = time - self.current_time

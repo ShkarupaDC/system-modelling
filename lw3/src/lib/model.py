@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Generic, Optional, Type, Any
 
 from .common import INF_TIME, TIME_EPS, T
-from .base import Node, Metrics
+from .base import Node, Metrics, NodeMetrics
 from .factory import BaseFactoryNode
 from .queueing import QueueingNode
 from .logger import Logger
@@ -31,18 +31,13 @@ class Evaluation(Generic[T]):
 
 
 @dataclass(eq=False)
-class ModelMetrics(Generic[T]):
-    model: T
+class ModelMetrics(Metrics[T]):
     num_events: int = field(init=False, default=0)
     simulation_time: float = field(init=False, default=0)
 
     @property
     def mean_event_intensity(self) -> float:
         return self.num_events / max(self.simulation_time, TIME_EPS)
-
-    def reset(self) -> None:
-        self.num_events = 0
-        self.simulation_time = 0
 
 
 class Verbosity(Flag):
@@ -51,7 +46,7 @@ class Verbosity(Flag):
     METRICS = auto()
 
 
-ModellingMetrics = tuple[ModelMetrics, list[EvaluationReport], list[Metrics]]
+ModellingMetrics = tuple[ModelMetrics, list[EvaluationReport], list[NodeMetrics]]
 
 
 class Model(Generic[T]):
@@ -69,7 +64,7 @@ class Model(Generic[T]):
         self.evaluations = [] if evaluations is None else evaluations
 
     def simulate(self, end_time: float, verbosity: Verbosity = Verbosity.METRICS) -> ModellingMetrics:
-        self.metrics.reset()
+        self.reset()
         current_time = 0
         while current_time < end_time:
             # Find next closest action
@@ -96,13 +91,17 @@ class Model(Generic[T]):
             if Verbosity.STATE in verbosity:
                 self.logger.log_state(current_time, self.nodes, updated_nodes)
         self.metrics.simulation_time = current_time
-
         modelling_metrics = self.metrics, [node.metrics for node in self.nodes
                                            ], [evaluation(self) for evaluation in self.evaluations]
         # Log metrics
         if Verbosity.METRICS in verbosity:
             self.logger.log_metrics(*modelling_metrics)
         return modelling_metrics
+
+    def reset(self) -> None:
+        for node in self.nodes:
+            node.reset()
+        self.metrics.reset()
 
     @staticmethod
     def from_factory(factory: Node[T], **kwargs: Any) -> 'Model[T]':

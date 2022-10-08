@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 import inspect
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, _MISSING_TYPE
 from typing import Callable, Generic, Iterable, Optional, Type, Any
 
 from .common import T
@@ -31,7 +31,21 @@ class Item:
 
 @dataclass(eq=False)
 class Metrics(Generic[T]):
-    node: T
+    parent: T
+
+    def reset(self) -> None:
+        for param in fields(self):
+            if not isinstance(param.default, _MISSING_TYPE):
+                default = param.default
+            elif not isinstance(param.default_factory, _MISSING_TYPE):
+                default = param.default_factory()
+            else:
+                continue
+            setattr(self, param.name, default)
+
+
+@dataclass(eq=False)
+class NodeMetrics(Metrics[T]):
     num_in: int = field(init=False, default=0)
     num_out: int = field(init=False, default=0)
 
@@ -43,7 +57,7 @@ class Node(ABC, Generic[T]):
                  delay_fn: DelayFn,
                  name: Optional[str] = None,
                  next_node: Optional['Node[T]'] = None,
-                 metrics_type: Type[Metrics['Node[T]']] = Metrics) -> None:
+                 metrics_type: Type[NodeMetrics['Node[T]']] = NodeMetrics) -> None:
         self.num_nodes += 1
         self.delay_fn = delay_fn
         self.delay_params = inspect.signature(self.delay_fn).parameters
@@ -75,6 +89,11 @@ class Node(ABC, Generic[T]):
         self.next_node = node
         if node is not None:
             node.prev_node = self
+
+    def reset(self) -> None:
+        self.current_time = 0
+        self.next_time = 0
+        self.metrics.reset()
 
     def _get_auto_name(self) -> str:
         return f'{self.__class__.__name__}{self.num_nodes}'

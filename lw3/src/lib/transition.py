@@ -28,6 +28,11 @@ class BaseTransitionNode(Node[T]):
         self.item = None
         return self._end_action(item)
 
+    def reset(self) -> None:
+        super().reset()
+        self.item = None
+        self.next_time = INF_TIME
+
     @abstractmethod
     def _get_next_node(self, _: T) -> Optional[Node[T]]:
         raise NotImplementedError

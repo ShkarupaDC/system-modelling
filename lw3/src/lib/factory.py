@@ -3,13 +3,13 @@ from dataclasses import dataclass, field
 from typing import Type, TypeVar, Any
 
 from .common import T
-from .base import Node, Metrics, Item
+from .base import Node, NodeMetrics, Item
 
 I = TypeVar('I', bound='Item')
 
 
 @dataclass(eq=False)
-class BaseFactoryMetrics(Metrics[Node[T]]):
+class BaseFactoryMetrics(NodeMetrics[Node[T]]):
     items: list[T] = field(init=False, default_factory=list)
 
 
@@ -24,6 +24,11 @@ class BaseFactoryNode(Node[T]):
     def start_action(self, item: T) -> T:
         super().start_action(item)
         raise RuntimeError('This method must not be called!')
+
+    def reset(self) -> None:
+        super().reset()
+        self.item = None
+        self.next_time = self._predict_next_time()
 
 
 @dataclass(eq=False)
