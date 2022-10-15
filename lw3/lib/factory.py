@@ -2,8 +2,8 @@ import statistics
 from dataclasses import dataclass, field
 from typing import Type, TypeVar, Any
 
-from .common import T
-from .base import Node, NodeMetrics, Item
+from lib.common import T
+from lib.base import Node, NodeMetrics, Item
 
 I = TypeVar('I', bound='Item')
 

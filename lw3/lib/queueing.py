@@ -3,8 +3,8 @@ import heapq
 from dataclasses import dataclass, field
 from typing import Optional, Generic, Type, TypeVar, Any
 
-from .common import INF_TIME, TIME_EPS, T
-from .base import Node, NodeMetrics
+from lib.common import INF_TIME, TIME_EPS, T
+from lib.base import Node, NodeMetrics
 
 Q = TypeVar('Q', bound='QueueingNode')
 
@@ -105,7 +105,7 @@ class QueueingMetrics(NodeMetrics[Q]):
         return self.wait_time / max(self.parent.current_time, TIME_EPS)
 
     @property
-    def mean_busy_handlers(self) -> float:
+    def mean_busy_channels(self) -> float:
         return self.busy_time / max(self.parent.current_time, TIME_EPS)
 
     @property
@@ -122,7 +122,7 @@ class QueueingMetrics(NodeMetrics[Q]):
 
 
 @dataclass(order=True)
-class Handler(Generic[T]):
+class Channel(Generic[T]):
     item: T = field(compare=False)
     next_time: float
 
@@ -131,18 +131,18 @@ class QueueingNode(Node[T]):
 
     def __init__(self,
                  queue: Queue[T] = Queue(),
-                 max_handlers: Optional[int] = None,
+                 max_channels: Optional[int] = None,
                  metrics_type: Type[QueueingMetrics[Q]] = QueueingMetrics,
                  **kwargs: Any) -> None:
         self.metrics: QueueingMetrics = None
         super().__init__(metrics_type=metrics_type, **kwargs)
         self.queue = queue
-        self.handlers = MinHeap[Handler[T]](maxlen=max_handlers)
+        self.channels = MinHeap[Channel[T]](maxlen=max_channels)
         self.next_time = INF_TIME
 
     @property
-    def num_handlers(self) -> int:
-        return len(self.handlers)
+    def num_channels(self) -> int:
+        return len(self.channels)
 
     @property
     def queuelen(self) -> int:
@@ -150,39 +150,39 @@ class QueueingNode(Node[T]):
 
     def start_action(self, item: T) -> None:
         super().start_action(item)
-        if self.handlers.is_full:
+        if self.channels.is_full:
             if self.queue.is_full:
                 self._failure_hook()
             else:
                 self.queue.push(item)
         else:
-            handler = Handler(item=item, next_time=self._predict_next_time(item=item))
-            self._before_add_handler_hook()
-            self.handlers.push(handler)
-            self.next_time = self.handlers.min.next_time
+            channel = Channel(item=item, next_time=self._predict_next_time(item=item))
+            self._before_add_channel_hook()
+            self.channels.push(channel)
+            self.next_time = self.channels.min.next_time
 
     def end_action(self) -> None:
-        item = self.handlers.pop().item
+        item = self.channels.pop().item
         if not self.queue.is_empty:
             next_item = self.queue.pop()
-            handler = Handler(item=next_item, next_time=self._predict_next_time(item=next_item))
-            self._before_add_handler_hook()
-            self.handlers.push(handler)
+            channel = Channel(item=next_item, next_time=self._predict_next_time(item=next_item))
+            self._before_add_channel_hook()
+            self.channels.push(channel)
 
-        next_handler = self.handlers.min
-        self.next_time = INF_TIME if next_handler is None else next_handler.next_time
+        next_channel = self.channels.min
+        self.next_time = INF_TIME if next_channel is None else next_channel.next_time
         return self._end_action(item)
 
     def reset(self) -> None:
         super().reset()
         self.next_time = INF_TIME
         self.queue.clear()
-        self.handlers.clear()
+        self.channels.clear()
 
     def _before_time_update_hook(self, time: float) -> None:
         dtime = time - self.current_time
         self.metrics.wait_time += self.queuelen * dtime
-        self.metrics.busy_time += self.num_handlers * dtime
+        self.metrics.busy_time += self.num_channels * dtime
 
     def _item_out_hook(self) -> None:
         super()._item_out_hook()
@@ -196,7 +196,7 @@ class QueueingNode(Node[T]):
             self.metrics.in_interval += self.current_time - self.metrics.in_time
         self.metrics.in_time = self.current_time
 
-    def _before_add_handler_hook(self) -> None:
+    def _before_add_channel_hook(self) -> None:
         pass
 
     def _failure_hook(self) -> None:

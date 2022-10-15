@@ -2,11 +2,11 @@ from enum import Flag, auto
 from dataclasses import dataclass, field
 from typing import Callable, Generic, Optional, Type, Any
 
-from .common import INF_TIME, TIME_EPS, T
-from .base import Node, Metrics, NodeMetrics
-from .factory import BaseFactoryNode
-from .queueing import QueueingNode
-from .logger import Logger
+from lib.common import INF_TIME, TIME_EPS, T
+from lib.base import Node, Metrics, NodeMetrics
+from lib.factory import BaseFactoryNode
+from lib.queueing import QueueingNode
+from lib.logger import Logger
 
 
 @dataclass(eq=False)

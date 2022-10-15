@@ -3,6 +3,7 @@ import math
 import random
 from functools import partial
 import time
+import sys
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Type, Any
@@ -11,19 +12,22 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
-from src.lib.base import Node, Item
-from src.lib.factory import FactoryNode
-from src.lib.queueing import QueueingNode, QueueingMetrics
-from src.lib.transition import ProbaTransitionNode
-from src.lib.model import Model, Verbosity, Evaluation
-from src.lib.logger import _format_float
+sys.path.append('../lw3')
+
+# pylint: disable=wrong-import-position, import-error
+from lib.base import Node, Item
+from lib.factory import FactoryNode
+from lib.queueing import QueueingNode, QueueingMetrics
+from lib.transition import ProbaTransitionNode
+from lib.model import Model, Verbosity, Evaluation
+from lib.logger import _format_float
 
 ELEMENTARY_OPERATION_TIME = 1e-6  # in seconds
 
 
 @dataclass(eq=False)
 class SystemQueueingMetrics(QueueingMetrics['SystemQueueingNode']):
-    num_handlers_history: list[int] = field(init=False, default_factory=list)
+    num_channels_history: list[int] = field(init=False, default_factory=list)
 
 
 class SystemQueueingNode(QueueingNode[Item]):
@@ -32,8 +36,8 @@ class SystemQueueingNode(QueueingNode[Item]):
         self.metrics: SystemQueueingMetrics = None
         super().__init__(metrics_type=metrics_type, **kwargs)
 
-    def _before_add_handler_hook(self) -> None:
-        self.metrics.num_handlers_history.append(self.num_handlers)
+    def _before_add_channel_hook(self) -> None:
+        self.metrics.num_channels_history.append(self.num_channels)
 
 
 def create_model(num_nodes: int, factory_time: float, queueing_time: float, prev_proba: float) -> Model[Item]:
@@ -45,7 +49,7 @@ def create_model(num_nodes: int, factory_time: float, queueing_time: float, prev
     node_idx = 2
     for idx in range(num_nodes):
         node = SystemQueueingNode(name=f'{node_idx:0{num_digits}d}. Queueing',
-                                  max_handlers=1,
+                                  max_channels=1,
                                   delay_fn=partial(random.expovariate, lambd=1.0 / queueing_time))
         node_idx += 1
         if idx >= 1:
@@ -59,10 +63,10 @@ def create_model(num_nodes: int, factory_time: float, queueing_time: float, prev
         prev_node = node
 
     def num_elementary_operations(model: Model[Item]) -> float:
-        num_handlers_history = itertools.chain.from_iterable(node.metrics.num_handlers_history for node in model.nodes
+        num_channels_history = itertools.chain.from_iterable(node.metrics.num_channels_history for node in model.nodes
                                                              if isinstance(node, SystemQueueingNode))
         num_insert_operations = [
-            num_handlers if num_handlers <= 1 else math.log2(num_handlers) for num_handlers in num_handlers_history
+            num_channels if num_channels <= 1 else math.log2(num_channels) for num_channels in num_channels_history
         ]
         mean_num_insert_operations = sum(num_insert_operations) / len(num_insert_operations)
         return 2 * (1 + mean_num_insert_operations)
@@ -99,7 +103,7 @@ def get_time_complexity_plot(simulation: list[float], measured: list[float], pre
 
 if __name__ == '__main__':
     # Parameters
-    save_path = Path.cwd().joinpath('time_complexity.png')
+    save_path = Path('/tmp/time_complexity.png')
     num_nodes = 20
     factory_time = 0.5
     queueing_time = 0.2

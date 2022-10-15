@@ -1,9 +1,9 @@
 from typing import Iterable, Optional, Any
 
-from ..lib.common import INF_TIME
-from ..lib.base import Node
-from ..lib.queueing import QueueingNode
-from ..lib.transition import BaseTransitionNode, ProbaTransitionNode
+from lib.common import INF_TIME
+from lib.base import Node
+from lib.queueing import QueueingNode
+from lib.transition import BaseTransitionNode, ProbaTransitionNode
 
 from .base import HospitalItem, SickType
 

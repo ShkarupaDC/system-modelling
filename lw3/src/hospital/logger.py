@@ -1,7 +1,7 @@
 from typing import Any
 
-from ..lib.base import Node, Metrics
-from ..lib.logger import MetricLoggerDispatcher, Logger
+from lib.base import Node, Metrics
+from lib.logger import MetricLoggerDispatcher, Logger
 
 from .base import HospitalItem
 from .factory import HospitalFactoryMetrics

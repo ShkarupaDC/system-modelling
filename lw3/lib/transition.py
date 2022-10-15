@@ -2,8 +2,8 @@ import random
 from abc import abstractmethod
 from typing import Iterable, Optional, Any
 
-from .common import INF_TIME, T
-from .base import Node, DelayFn
+from lib.common import INF_TIME, T
+from lib.base import Node, DelayFn
 
 NodesProbes = dict[Node[T], float]
 NodesAndProbes = tuple[tuple[Node[T]], tuple[float]]

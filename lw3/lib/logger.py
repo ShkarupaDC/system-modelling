@@ -1,11 +1,11 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Callable, Generic
 
-from .common import T
-from .base import Item, Node, Metrics, NodeMetrics
-from .factory import BaseFactoryNode, FactoryMetrics
-from .queueing import Handler, MinHeap, Queue, QueueingNode, QueueingMetrics
-from .transition import BaseTransitionNode
+from lib.common import T
+from lib.base import Item, Node, Metrics, NodeMetrics
+from lib.factory import BaseFactoryNode, FactoryMetrics
+from lib.queueing import Channel, MinHeap, Queue, QueueingNode, QueueingMetrics
+from lib.transition import BaseTransitionNode
 
 if TYPE_CHECKING:
     from .model import Model, EvaluationReport, ModelMetrics
@@ -41,13 +41,13 @@ class Logger(Generic[T]):
             f'item={node.item}, '
             f'created={self.float(node.item.created)}' if isinstance(node.item, Item) else '')
 
-    def handler(self, handler: Handler) -> str:
-        return f'Handler(item={handler.item}, next_time={self.float(handler.next_time)})'
+    def channel(self, channel: Channel) -> str:
+        return f'Channel(item={channel.item}, next_time={self.float(channel.next_time)})'
 
-    def handlers(self, handlers: MinHeap[Handler]) -> str:
-        return ('Handlers('
-                f'max_handlers={handlers.maxlen}, '
-                f"handlers=[{', '.join(self.handler(handler) for handler in handlers.heap)}])")
+    def channels(self, channels: MinHeap[Channel]) -> str:
+        return ('Channels('
+                f'max_channels={channels.maxlen}, '
+                f"channels=[{', '.join(self.channel(channel) for channel in channels.heap)}])")
 
     def queue(self, queue: Queue[T]) -> str:
         return f'Queue(max_size={queue.maxlen}, items={list(queue.queue)})'
@@ -55,7 +55,7 @@ class Logger(Generic[T]):
     def queueing_node(self, node: QueueingNode[T]) -> str:
         return self._base_node(
             node, f'next_time={self.float(node.next_time)}, '
-            f'handlers={self.handlers(node.handlers)}, '
+            f'channels={self.channels(node.channels)}, '
             f'queue={self.queue(node.queue)}, '
             f'num_failures={node.metrics.num_failures}')
 
@@ -86,7 +86,7 @@ class Logger(Generic[T]):
                 f'Mean interval between input actions: {self.float(metrics.mean_in_interval)}. '
                 f'Mean interval between output actions: {self.float(metrics.mean_out_interval)}. '
                 f'Mean queue size: {self.float(metrics.mean_queuelen)}. '
-                f'Mean busy handlers: {self.float(metrics.mean_busy_handlers)}. '
+                f'Mean busy channels: {self.float(metrics.mean_busy_channels)}. '
                 f'Mean wait time: {self.float(metrics.mean_wait_time)}. '
                 f'Mean processing time: {self.float(metrics.mean_busy_time)}. '
                 f'Failure probability: {self.float(metrics.failure_proba)}')

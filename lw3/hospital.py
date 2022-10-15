@@ -1,9 +1,9 @@
 import random
 from functools import partial
 
-from src.lib.common import erlang
-from src.lib.queueing import QueueingNode
-from src.lib.model import Model
+from lib.common import erlang
+from lib.queueing import QueueingNode
+from lib.model import Model
 
 from src.hospital import (HospitalItem, SickType, HospitalFactoryNode, EmergencyQueue, TestingTransitionNode,
                           EmergencyTransitionNode, HospitalLogger)
@@ -19,16 +19,16 @@ def run_simulation() -> None:
     at_emergency = QueueingNode[HospitalItem](
         name='2. At Emergency',
         queue=EmergencyQueue(),
-        max_handlers=2,
+        max_channels=2,
         delay_fn=lambda item: random.expovariate(lambd=1.0 / at_emergency_mean[item.sick_type]))
 
     to_chumber = QueueingNode[HospitalItem](name='4. To chumber',
-                                            max_handlers=3,
+                                            max_channels=3,
                                             delay_fn=partial(random.uniform, a=3, b=8))
     to_reception = QueueingNode[HospitalItem](name='5. To reception', delay_fn=partial(random.uniform, a=2, b=5))
     at_reception = QueueingNode[HospitalItem](name='6. At reception', delay_fn=partial(erlang, lambd=3 / 4.5, k=3))
     on_testing = QueueingNode[HospitalItem](name='7. On Testing',
-                                            max_handlers=2,
+                                            max_channels=2,
                                             delay_fn=partial(erlang, lambd=2 / 4, k=2))
 
     # Connections

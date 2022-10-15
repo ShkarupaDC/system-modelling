@@ -1,11 +1,11 @@
 import random
 from functools import partial
 
-from src.lib.base import Item
-from src.lib.queueing import Queue
-from src.lib.factory import FactoryNode
-from src.lib.model import Model, Evaluation
-from src.lib.logger import _format_float
+from lib.base import Item
+from lib.queueing import Queue
+from lib.factory import FactoryNode
+from lib.model import Model, Evaluation
+from lib.logger import _format_float
 
 from src.bank import BankQueueingNode, BankTransitionNode, BankLogger
 
@@ -15,12 +15,12 @@ def run_simulation() -> None:
     checkout1 = BankQueueingNode[Item](name='3. First checkout',
                                        min_diff=2,
                                        queue=Queue(maxlen=3),
-                                       max_handlers=1,
+                                       max_channels=1,
                                        delay_fn=partial(random.expovariate, lambd=1.0 / 0.3))
     checkout2 = BankQueueingNode[Item](name='4. Second checkout',
                                        min_diff=2,
                                        queue=Queue(maxlen=3),
-                                       max_handlers=1,
+                                       max_channels=1,
                                        delay_fn=partial(random.expovariate, lambd=1.0 / 0.3))
     checkout1.set_neighbor(checkout2)
     transition = BankTransitionNode[Item](name='2. First vs Second', first=checkout1, second=checkout2)
@@ -37,7 +37,7 @@ def run_simulation() -> None:
     def mean_cars_in_bank(_: Model) -> float:
         metrics1 = checkout1.metrics
         metrics2 = checkout2.metrics
-        return metrics1.mean_busy_handlers + metrics1.mean_queuelen + metrics2.mean_busy_handlers + metrics2.mean_queuelen
+        return metrics1.mean_busy_channels + metrics1.mean_queuelen + metrics2.mean_busy_channels + metrics2.mean_queuelen
 
     model = Model.from_factory(incoming_cars,
                                evaluations=[

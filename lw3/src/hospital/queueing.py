@@ -1,4 +1,4 @@
-from ..lib.queueing import Queue
+from lib.queueing import Queue
 
 from .base import HospitalItem, SickType
 
