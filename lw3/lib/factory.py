@@ -1,4 +1,5 @@
 import statistics
+import itertools
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import Type, TypeVar, Any
@@ -21,10 +22,11 @@ class BaseFactoryNode(Node[T]):
         super().__init__(metrics_type=metrics_type, **kwargs)
         self.item: T = None
         self.next_time = self._predict_next_time()
+        self.counter = itertools.count()
 
     @property
     def next_id(self) -> int:
-        return self.metrics.num_out
+        return next(self.counter)
 
     def start_action(self, item: T) -> T:
         super().start_action(item)
@@ -55,9 +57,7 @@ class FactoryMetrics(BaseFactoryMetrics[I]):
 
     @property
     def mean_time(self) -> float:
-        if time_data := self.time_per_item.values():
-            return statistics.mean(time_data)
-        return 0
+        return statistics.mean(time_data) if (time_data := self.time_per_item.values()) else 0
 
 
 class FactoryNode(BaseFactoryNode[Item]):

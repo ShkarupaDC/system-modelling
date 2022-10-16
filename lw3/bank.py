@@ -2,7 +2,7 @@ import random
 from functools import partial
 
 from lib.base import Item
-from lib.queueing import Queue
+from lib.queueing import Channel, Queue
 from lib.factory import FactoryNode
 from lib.model import Model, Evaluation
 from lib.logger import _format_float
@@ -25,6 +25,17 @@ def run_simulation() -> None:
     checkout1.set_neighbor(checkout2)
     transition = BankTransitionNode[Item](name='2. First vs Second', first=checkout1, second=checkout2)
     incoming_cars.set_next_node(transition)
+
+    # Initial conditions
+    checkout1.channels.push(
+        Channel(item=Item(id=incoming_cars.next_id), next_time=random.normalvariate(mu=1.0, sigma=0.3)))
+    checkout2.channels.push(
+        Channel(item=Item(id=incoming_cars.next_id), next_time=random.normalvariate(mu=1.0, sigma=0.3)))
+    for _ in range(2):
+        checkout1.queue.push(Item(id=incoming_cars.next_id))
+    for _ in range(2):
+        checkout2.queue.push(Item(id=incoming_cars.next_id))
+    incoming_cars.next_time = 0.1
 
     def total_failure_proba(_: Model) -> float:
         metrics1 = checkout1.metrics

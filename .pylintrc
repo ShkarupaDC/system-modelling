@@ -9,13 +9,11 @@ disable=
     invalid-name,
     no-else-return,
     protected-access,
-    misplaced-comparison-constant,
     redefined-outer-name,
     too-many-return-statements,
     too-many-public-methods,
     too-many-statements,
     too-many-ancestors,
-    no-self-use, # disable until https://github.com/PyCQA/pylint/issues/3705 is fixed
     duplicate-code,
     keyword-arg-before-vararg
 
