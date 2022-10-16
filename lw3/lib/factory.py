@@ -1,4 +1,5 @@
 import statistics
+from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import Type, TypeVar, Any
 
@@ -21,14 +22,28 @@ class BaseFactoryNode(Node[T]):
         self.item: T = None
         self.next_time = self._predict_next_time()
 
+    @property
+    def next_id(self) -> int:
+        return self.metrics.num_out
+
     def start_action(self, item: T) -> T:
         super().start_action(item)
         raise RuntimeError('This method must not be called!')
+
+    def end_action(self) -> T:
+        self.item = self._get_next_item()
+        self.metrics.items.append(self.item)
+        self.next_time = self._predict_next_time()
+        return self._end_action(self.item)
 
     def reset(self) -> None:
         super().reset()
         self.item = None
         self.next_time = self._predict_next_time()
+
+    @abstractmethod
+    def _get_next_item(self) -> T:
+        raise NotImplementedError
 
 
 @dataclass(eq=False)
@@ -36,7 +51,7 @@ class FactoryMetrics(BaseFactoryMetrics[I]):
 
     @property
     def time_per_item(self) -> dict[I, float]:
-        return {item: item.history[-1].time - item.history[0].time for item in self.items if item.processed}
+        return {item: item.released_time - item.created_time for item in self.items if item.processed}
 
     @property
     def mean_time(self) -> float:
@@ -51,8 +66,5 @@ class FactoryNode(BaseFactoryNode[Item]):
         self.metrics: FactoryMetrics[Item] = None
         super().__init__(metrics_type=metrics_type, **kwargs)
 
-    def end_action(self) -> Item:
-        self.next_time = self._predict_next_time()
-        self.item = Item(id=self.metrics.num_out, created=self.current_time)
-        self.metrics.items.append(self.item)
-        return self._end_action(self.item)
+    def _get_next_item(self) -> Item:
+        return Item(id=self.next_id)

@@ -1,6 +1,5 @@
 from typing import Iterable, Optional, Any
 
-from lib.common import INF_TIME
 from lib.base import Node
 from lib.queueing import QueueingNode
 from lib.transition import BaseTransitionNode, ProbaTransitionNode
@@ -10,15 +9,9 @@ from .base import HospitalItem, SickType
 
 class TestingTransitionNode(ProbaTransitionNode[HospitalItem]):
 
-    def end_action(self) -> HospitalItem:
-        item = self.item
-        next_node = self._get_next_node(item)
-        if next_node is not None:
+    def _process_item(self, item: HospitalItem) -> None:
+        if self.next_node is not None:
             item.as_first_sick = True
-        self.set_next_node(next_node)
-        self.next_time = INF_TIME
-        self.item = None
-        return self._end_action(item)
 
 
 class EmergencyTransitionNode(BaseTransitionNode[HospitalItem]):

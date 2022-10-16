@@ -24,6 +24,7 @@ class BaseTransitionNode(Node[T]):
     def end_action(self) -> T:
         item = self.item
         self.set_next_node(self._get_next_node(item))
+        self._process_item(item)
         self.next_time = INF_TIME
         self.item = None
         return self._end_action(item)
@@ -32,6 +33,9 @@ class BaseTransitionNode(Node[T]):
         super().reset()
         self.item = None
         self.next_time = INF_TIME
+
+    def _process_item(self, _: T) -> None:
+        pass
 
     @abstractmethod
     def _get_next_node(self, _: T) -> Optional[Node[T]]:
@@ -42,7 +46,12 @@ class ProbaTransitionNode(BaseTransitionNode[T]):
 
     def __init__(self, nodes_probas: NodesProbes, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.next_nodes, self.next_probas = self._process_input(nodes_probas)
+        proba_sum = sum(nodes_probas.values())
+        if proba_sum > 1:
+            raise RuntimeError(f'Total probability must be <= 1. Given: {proba_sum}')
+        if proba_sum < 1:
+            nodes_probas[None] = 1 - proba_sum
+        self.next_nodes, self.next_probas = zip(*nodes_probas.items())
 
     @property
     def connected_nodes(self) -> Iterable['Node[T]']:
@@ -50,12 +59,3 @@ class ProbaTransitionNode(BaseTransitionNode[T]):
 
     def _get_next_node(self, _: T) -> Optional[Node[T]]:
         return random.choices(self.next_nodes, self.next_probas, k=1)[0]
-
-    @staticmethod
-    def _process_input(nodes_probas: NodesProbes) -> NodesAndProbes:
-        proba_sum = sum(nodes_probas.values())
-        if proba_sum > 1:
-            raise RuntimeError(f'Total probability must be <= 1. Given: {proba_sum}')
-        if proba_sum < 1:
-            nodes_probas[None] = 1 - proba_sum
-        return zip(*nodes_probas.items())

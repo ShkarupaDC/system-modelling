@@ -2,11 +2,11 @@ import random
 from functools import partial
 
 from lib.common import erlang
-from lib.queueing import QueueingNode
+from lib.queueing import PriorityQueue, QueueingNode
 from lib.model import Model
 
-from src.hospital import (HospitalItem, SickType, HospitalFactoryNode, EmergencyQueue, TestingTransitionNode,
-                          EmergencyTransitionNode, HospitalLogger)
+from src.hospital import (HospitalItem, SickType, HospitalFactoryNode, TestingTransitionNode, EmergencyTransitionNode,
+                          HospitalLogger)
 
 
 def run_simulation() -> None:
@@ -18,7 +18,8 @@ def run_simulation() -> None:
     at_emergency_mean = {SickType.FIRST: 15, SickType.SECOND: 40, SickType.THIRD: 30}
     at_emergency = QueueingNode[HospitalItem](
         name='2. At Emergency',
-        queue=EmergencyQueue(),
+        queue=PriorityQueue[HospitalItem](
+            priority_fn=lambda item: int(item.sick_type == SickType.FIRST or item.as_first_sick), fifo=True),
         max_channels=2,
         delay_fn=lambda item: random.expovariate(lambd=1.0 / at_emergency_mean[item.sick_type]))
 

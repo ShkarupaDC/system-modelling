@@ -1,4 +1,5 @@
 from __future__ import annotations
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Callable, Generic
 
 from lib.common import T
@@ -18,7 +19,19 @@ def _format_float(value: float, precision: str = 3) -> str:
     return f'{value:.{precision}f}'
 
 
-class Logger(Generic[T]):
+class BaseLogger(ABC, Generic[T]):
+
+    @abstractmethod
+    def log_state(self, time: float, nodes: list[Node[T]], updated_nodes: list[Node[T]]) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def log_metrics(self, model_metrics: ModelMetrics[Model[T]], nodes_metrics: list[NodeMetrics[Node[T]]],
+                    evaluations: list[EvaluationReport]) -> None:
+        raise NotImplementedError
+
+
+class Logger(BaseLogger[T]):
 
     def __init__(self, precision: int = 3) -> None:
         self.precision = precision
@@ -39,7 +52,7 @@ class Logger(Generic[T]):
         return self._base_node(
             node, f'next_time={self.float(node.next_time)}, '
             f'item={node.item}, '
-            f'created={self.float(node.item.created)}' if isinstance(node.item, Item) else '')
+            f'created={self.float(node.item.created_time)}' if isinstance(node.item, Item) else '')
 
     def channel(self, channel: Channel) -> str:
         return f'Channel(item={channel.item}, next_time={self.float(channel.next_time)})'

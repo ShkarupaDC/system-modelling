@@ -1,7 +1,10 @@
 from collections import deque
 import heapq
+import itertools
+from numbers import Number
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional, Generic, Type, TypeVar, Any
+from typing import Callable, Optional, Generic, Type, TypeVar, Any
 
 from lib.common import INF_TIME, TIME_EPS, T
 from lib.base import Node, NodeMetrics
@@ -9,7 +12,44 @@ from lib.base import Node, NodeMetrics
 Q = TypeVar('Q', bound='QueueingNode')
 
 
-class Queue(Generic[T]):
+class BoundedCollection(ABC, Generic[T]):
+
+    @abstractmethod
+    def __len__(self) -> int:
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def bounded(self) -> bool:
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def maxlen(self) -> Optional[int]:
+        raise NotImplementedError
+
+    @property
+    def is_empty(self) -> bool:
+        return len(self) == 0
+
+    @property
+    def is_full(self) -> bool:
+        return self.bounded and len(self) == self.maxlen
+
+    @abstractmethod
+    def clear(self) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def push(self, item: T) -> Optional[T]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def pop(self) -> T:
+        raise NotImplementedError
+
+
+class Queue(BoundedCollection[T]):
 
     def __init__(self, maxlen: Optional[int] = None) -> None:
         self.queue: deque[T] = deque(maxlen=maxlen)
@@ -25,28 +65,26 @@ class Queue(Generic[T]):
     def maxlen(self) -> Optional[int]:
         return self.queue.maxlen
 
-    @property
-    def is_empty(self) -> bool:
-        return len(self) == 0
-
-    @property
-    def is_full(self) -> bool:
-        return self.bounded and len(self) == self.maxlen
-
     def clear(self) -> None:
         self.queue.clear()
 
-    def push(self, item: T) -> None:
-        self.queue.append(item)
+    def push(self, item: T) -> Optional[T]:
+        return self.queue.append(item)
 
     def pop(self) -> T:
         return self.queue.popleft()
 
 
-class MinHeap(Generic[T]):
+class LIFOQueue(Queue[T]):
+
+    def pop(self) -> T:
+        return self.queue.pop()
+
+
+class MinHeap(BoundedCollection[T]):
 
     def __init__(self, maxlen: Optional[int] = None) -> None:
-        self.maxlen = maxlen
+        self._maxlen = maxlen
         self.heap: list[T] = []
         heapq.heapify(self.heap)
 
@@ -58,12 +96,8 @@ class MinHeap(Generic[T]):
         return self.maxlen is not None
 
     @property
-    def is_empty(self) -> bool:
-        return len(self) == 0
-
-    @property
-    def is_full(self) -> bool:
-        return self.bounded and len(self) == self.maxlen
+    def maxlen(self) -> Optional[int]:
+        return self._maxlen
 
     @property
     def min(self) -> Optional[T]:
@@ -79,6 +113,29 @@ class MinHeap(Generic[T]):
 
     def pop(self) -> T:
         return heapq.heappop(self.heap)
+
+
+class PriorityQueue(MinHeap[T]):
+
+    def __init__(self, priority_fn: Callable[[T], Number], fifo: Optional[bool] = None, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.fifo = fifo
+        self.priority_fn = priority_fn
+
+        if self.fifo is not None:
+            self.counter = itertools.count()
+
+    def push(self, item: T) -> Optional[T]:
+        priority = self.priority_fn(item)
+        if self.fifo is None:
+            element = (priority, item)
+        else:
+            count = next(self.counter)
+            element = (priority, count if self.fifo else -count, item)
+        return super().push(element)
+
+    def pop(self) -> T:
+        return super().pop()[-1]
 
 
 @dataclass(eq=False)
@@ -130,7 +187,7 @@ class Channel(Generic[T]):
 class QueueingNode(Node[T]):
 
     def __init__(self,
-                 queue: Queue[T] = Queue(),
+                 queue: BoundedCollection[T] = Queue[T](),
                  max_channels: Optional[int] = None,
                  metrics_type: Type[QueueingMetrics[Q]] = QueueingMetrics,
                  **kwargs: Any) -> None:
@@ -184,14 +241,14 @@ class QueueingNode(Node[T]):
         self.metrics.wait_time += self.queuelen * dtime
         self.metrics.busy_time += self.num_channels * dtime
 
-    def _item_out_hook(self) -> None:
-        super()._item_out_hook()
+    def _item_out_hook(self, item: T) -> None:
+        super()._item_out_hook(item)
         if self.metrics.num_out > 1:
             self.metrics.out_interval += self.current_time - self.metrics.out_time
         self.metrics.out_time = self.current_time
 
-    def _item_in_hook(self) -> None:
-        super()._item_in_hook()
+    def _item_in_hook(self, item: T) -> None:
+        super()._item_in_hook(item)
         if self.metrics.num_in > 1:
             self.metrics.in_interval += self.current_time - self.metrics.in_time
         self.metrics.in_time = self.current_time

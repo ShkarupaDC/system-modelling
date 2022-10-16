@@ -6,7 +6,7 @@ from lib.common import INF_TIME, TIME_EPS, T
 from lib.base import Node, Metrics, NodeMetrics
 from lib.factory import BaseFactoryNode
 from lib.queueing import QueueingNode
-from lib.logger import Logger
+from lib.logger import BaseLogger, Logger
 
 
 @dataclass(eq=False)
@@ -56,7 +56,7 @@ class Model(Generic[T]):
             nodes: list[Node[T]],
             metrics_type: Type[ModelMetrics] = ModelMetrics,
             evaluations: Optional[list[Evaluation]] = None,
-            logger: Logger = Logger(),
+            logger: BaseLogger = Logger(),
     ) -> None:
         self.nodes = nodes
         self.logger = logger
@@ -87,12 +87,14 @@ class Model(Generic[T]):
                 node.end_action()
                 if isinstance(node, (BaseFactoryNode, QueueingNode)):
                     self.metrics.num_events += 1
-            # Log states
+            self.metrics.simulation_time = current_time
+            # Log state
             if Verbosity.STATE in verbosity:
                 self.logger.log_state(current_time, self.nodes, updated_nodes)
-        self.metrics.simulation_time = current_time
-        modelling_metrics = self.metrics, [node.metrics for node in self.nodes
-                                           ], [evaluation(self) for evaluation in self.evaluations]
+        # Collect metrics
+        nodes_metrics = [node.metrics for node in self.nodes]
+        evaluation_reports = [evaluation(self) for evaluation in self.evaluations]
+        modelling_metrics = self.metrics, nodes_metrics, evaluation_reports
         # Log metrics
         if Verbosity.METRICS in verbosity:
             self.logger.log_metrics(*modelling_metrics)

@@ -16,7 +16,7 @@ class ActionType(str, Enum):
 
 @dataclass(eq=False)
 class ActionRecord:
-    node_name: str
+    node: 'Node[Item]'
     action_type: ActionType
     time: float
 
@@ -24,9 +24,24 @@ class ActionRecord:
 @dataclass(eq=False)
 class Item:
     id: int = 0
-    created: float = field(repr=False, default=0)
     processed: bool = field(init=False, repr=False, default=False)
     history: list[ActionRecord] = field(init=False, repr=False, default_factory=list)
+
+    @property
+    def created_time(self) -> float:
+        return self.history[0].time
+
+    @property
+    def last_time(self) -> float:
+        return self.history[-1].time
+
+    @property
+    def released_time(self) -> Optional[float]:
+        return self.last_time if self.processed else 0
+
+    @property
+    def time_in_system(self) -> float:
+        return self.last_time - self.created_time
 
 
 @dataclass(eq=False)
@@ -73,9 +88,9 @@ class Node(ABC, Generic[T]):
         return [self.next_node]
 
     def start_action(self, item: T) -> None:
-        self._item_in_hook()
+        self._item_in_hook(item)
         if isinstance(item, Item):
-            item.history.append(ActionRecord(self.name, ActionType.IN, self.current_time))
+            item.history.append(ActionRecord(self, ActionType.IN, self.current_time))
 
     @abstractmethod
     def end_action(self) -> T:
@@ -98,14 +113,16 @@ class Node(ABC, Generic[T]):
     def _get_auto_name(self) -> str:
         return f'{self.__class__.__name__}{self.num_nodes}'
 
+    def _get_delay(self, **kwargs: Any) -> float:
+        return self.delay_fn(**{name: value for name, value in kwargs.items() if name in self.delay_params})
+
     def _predict_next_time(self, **kwargs: Any) -> float:
-        delay = self.delay_fn(**{name: value for name, value in kwargs.items() if name in self.delay_params})
-        return self.current_time + delay
+        return self.current_time + self._get_delay(**kwargs)
 
     def _end_action(self, item: T) -> T:
-        self._item_out_hook()
+        self._item_out_hook(item)
         if isinstance(item, Item):
-            item.history.append(ActionRecord(self.name, ActionType.OUT, self.current_time))
+            item.history.append(ActionRecord(self, ActionType.OUT, self.current_time))
         self._start_next_action(item)
         return item
 
@@ -116,10 +133,10 @@ class Node(ABC, Generic[T]):
             if isinstance(item, Item):
                 item.processed = True
 
-    def _item_in_hook(self) -> None:
+    def _item_in_hook(self, _: T) -> None:
         self.metrics.num_in += 1
 
-    def _item_out_hook(self) -> None:
+    def _item_out_hook(self, _: T) -> None:
         self.metrics.num_out += 1
 
     def _before_time_update_hook(self, _: float) -> None:

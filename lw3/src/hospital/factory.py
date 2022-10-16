@@ -29,12 +29,9 @@ class HospitalFactoryNode(BaseFactoryNode[HospitalItem]):
         super().__init__(metrics_type=metrics_type, **kwargs)
         self.sick_types, self.sick_probas = zip(*probas.items())
 
-    def end_action(self) -> HospitalItem:
+    def _get_next_item(self) -> HospitalItem:
         sick_type = self._get_next_type()
-        self.item = HospitalItem(id=self.metrics.num_out, created=self.current_time, sick_type=sick_type)
-        self.metrics.items.append(self.item)
-        self.next_time = self._predict_next_time()
-        return self._end_action(self.item)
+        return HospitalItem(id=self.next_id, sick_type=sick_type)
 
     def _get_next_type(self) -> SickType:
         return random.choices(self.sick_types, self.sick_probas, k=1)[0]
