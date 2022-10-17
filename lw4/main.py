@@ -12,7 +12,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
-sys.path.append('../lw3')
+sys.path.append(str(Path(__file__).parents[1].joinpath('lw3')))
 
 # pylint: disable=wrong-import-position, import-error
 from lib.base import Node, Item
@@ -53,9 +53,9 @@ def create_model(num_nodes: int, factory_time: float, queueing_time: float, prev
                                   delay_fn=partial(random.expovariate, lambd=1.0 / queueing_time))
         node_idx += 1
         if idx >= 1:
-            mext_probas = {prev_node: prev_proba, node: 1.0 - prev_proba}
-            next_node = ProbaTransitionNode[Item](name=f'{node_idx:0{num_digits}d}. Previous vs Next',
-                                                  nodes_probas=mext_probas)
+            next_node = ProbaTransitionNode[Item](name=f'{node_idx:0{num_digits}d}. Previous vs Next')
+            next_node.add_next_node(prev_node, proba=prev_proba)
+            next_node.add_next_node(node, proba=1.0 - prev_proba)
             node_idx += 1
         else:
             next_node = node

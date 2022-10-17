@@ -44,18 +44,25 @@ class BaseTransitionNode(Node[T]):
 
 class ProbaTransitionNode(BaseTransitionNode[T]):
 
-    def __init__(self, nodes_probas: NodesProbes, **kwargs: Any) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        proba_sum = sum(nodes_probas.values())
-        if proba_sum > 1:
-            raise RuntimeError(f'Total probability must be <= 1. Given: {proba_sum}')
-        if proba_sum < 1:
-            nodes_probas[None] = 1 - proba_sum
-        self.next_nodes, self.next_probas = zip(*nodes_probas.items())
+        self.proba_sum: float = 0
+        self.next_nodes: list[Node[T]] = []
+        self.next_probas: list[float] = []
 
     @property
     def connected_nodes(self) -> Iterable['Node[T]']:
         return self.next_nodes
 
+    def add_next_node(self, node: Optional[Node[T]], proba: float = 1.0) -> None:
+        proba_sum = self.proba_sum + proba
+        if proba_sum > 1:
+            raise RuntimeError(f'Total probability must be <= 1. Given: {proba_sum}')
+        self.proba_sum = proba_sum
+        self.next_nodes.append(node)
+        self.next_probas.append(proba)
+
     def _get_next_node(self, _: T) -> Optional[Node[T]]:
+        if self.proba_sum < 1:
+            self.add_next_node(node=None, proba=1 - self.proba_sum)
         return random.choices(self.next_nodes, self.next_probas, k=1)[0]

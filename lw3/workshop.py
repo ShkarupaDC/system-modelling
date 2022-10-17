@@ -23,13 +23,15 @@ def run_simulation() -> None:
                                 queue=PriorityQueue(priority_fn=repair_time_priority, fifo=True),
                                 max_channels=3,
                                 delay_fn=partial(erlang, lambd=22 / 242, k=int(22 * 22 / 242)))
+    # queue=PriorityQueue(priority_fn=compare_priority)
     control = QueueingNode[CarUnit](name='3. Control shop', max_channels=1, delay_fn=lambda: 6)
-    after_control = AfterControlTransition(name='4. Repair shop vs Release', nodes_probas={repair: 0.15})
+    after_control = AfterControlTransition(name='4. Repair shop vs Release')
 
     # Connections
     car_units.set_next_node(repair)
     repair.set_next_node(control)
     control.set_next_node(after_control)
+    after_control.add_next_node(repair, proba=0.15)
 
     # Initial condition
     repair.channels.push(Channel(CarUnit(id=car_units.next_id), next_time=1.0))
