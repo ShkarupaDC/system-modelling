@@ -34,8 +34,8 @@ def run_simulation() -> None:
     after_control.add_next_node(repair, proba=0.15)
 
     # Initial condition
-    repair.channels.push(Channel(CarUnit(id=car_units.next_id), next_time=1.0))
-    repair.channels.push(Channel(CarUnit(id=car_units.next_id), next_time=1.5))
+    repair.add_channel(Channel(CarUnit(id=car_units.next_id), next_time=1.0))
+    repair.add_channel(Channel(CarUnit(id=car_units.next_id), next_time=1.5))
     car_units.next_time = 0
 
     def mean_units_in_system(_: Model) -> float:

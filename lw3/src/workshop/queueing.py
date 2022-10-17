@@ -7,7 +7,7 @@ from .base import CarUnit
 
 class RepairQueueingNode(QueueingNode[CarUnit]):
 
-    def _predict_next_time(self, **kwargs: Any) -> float:
+    def _predict_item_time(self, **kwargs: Any) -> float:
         item: CarUnit = kwargs['item']
         return self.current_time + item.repair_time
 

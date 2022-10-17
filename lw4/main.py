@@ -17,7 +17,7 @@ sys.path.append(str(Path(__file__).parents[1].joinpath('lw3')))
 # pylint: disable=wrong-import-position, import-error
 from lib.base import Node, Item
 from lib.factory import FactoryNode
-from lib.queueing import QueueingNode, QueueingMetrics
+from lib.queueing import Channel, QueueingNode, QueueingMetrics
 from lib.transition import ProbaTransitionNode
 from lib.model import Model, Verbosity, Evaluation
 from lib.logger import _format_float
@@ -36,7 +36,7 @@ class SystemQueueingNode(QueueingNode[Item]):
         self.metrics: SystemQueueingMetrics = None
         super().__init__(metrics_type=metrics_type, **kwargs)
 
-    def _before_add_channel_hook(self) -> None:
+    def _before_add_channel_hook(self, _: Channel[Item]) -> None:
         self.metrics.num_channels_history.append(self.num_channels)
 
 
@@ -120,6 +120,7 @@ if __name__ == '__main__':
 
     for simulation_time in tqdm(simulation_times, desc='Simulations'):
         measured_time, predicted_time = run_simulation(model=model, simulation_time=simulation_time)
+        model.reset()
         measured_times.append(measured_time)
         predicted_times.append(predicted_time)
 

@@ -64,7 +64,6 @@ class Model(Generic[T]):
         self.evaluations = [] if evaluations is None else evaluations
 
     def simulate(self, end_time: float, verbosity: Verbosity = Verbosity.METRICS) -> ModellingMetrics:
-        self.reset()
         current_time = 0
         while current_time < end_time:
             # Find next closest action
@@ -78,12 +77,14 @@ class Model(Generic[T]):
             current_time = next_time
             for node in self.nodes:
                 node.update_time(current_time)
-            # Run actions
+            # Select nodes to be updated now
             updated_nodes: list[Node[T]] = []
             for node in self.nodes:
                 if abs(next_time - node.next_time) > TIME_EPS:
                     continue
                 updated_nodes.append(node)
+            # Run actions
+            for node in updated_nodes:
                 node.end_action()
                 if isinstance(node, (BaseFactoryNode, QueueingNode)):
                     self.metrics.num_events += 1

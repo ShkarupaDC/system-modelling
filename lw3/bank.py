@@ -27,9 +27,9 @@ def run_simulation() -> None:
     incoming_cars.set_next_node(transition)
 
     # Initial conditions
-    checkout1.channels.push(
+    checkout1.add_channel(
         Channel(item=Item(id=incoming_cars.next_id), next_time=random.normalvariate(mu=1.0, sigma=0.3)))
-    checkout2.channels.push(
+    checkout2.add_channel(
         Channel(item=Item(id=incoming_cars.next_id), next_time=random.normalvariate(mu=1.0, sigma=0.3)))
     for _ in range(2):
         checkout1.queue.push(Item(id=incoming_cars.next_id))

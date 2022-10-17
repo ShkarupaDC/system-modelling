@@ -5,7 +5,7 @@ from lib.base import Item
 
 @dataclass(eq=False)
 class CarUnit(Item):
-    repair_time: float = field(init=False, default=0)
+    repair_time: float = field(init=False, repr=False, default=0)
     returned: bool = field(init=False, default=False)
 
     def __lt__(self, other: 'CarUnit') -> bool:

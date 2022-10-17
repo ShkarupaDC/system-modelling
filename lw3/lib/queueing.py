@@ -4,7 +4,7 @@ import itertools
 from numbers import Number
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Callable, Optional, Generic, Type, TypeVar, Any
+from typing import Callable, Iterable, Optional, Generic, Type, TypeVar, Any
 
 from lib.common import INF_TIME, TIME_EPS, T
 from lib.base import Node, NodeMetrics
@@ -27,6 +27,11 @@ class BoundedCollection(ABC, Generic[T]):
     @abstractmethod
     def maxlen(self) -> Optional[int]:
         raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def data(self) -> Iterable[T]:
+        return NotImplementedError
 
     @property
     def is_empty(self) -> bool:
@@ -65,6 +70,10 @@ class Queue(BoundedCollection[T]):
     def maxlen(self) -> Optional[int]:
         return self.queue.maxlen
 
+    @property
+    def data(self) -> deque[T]:
+        return self.queue
+
     def clear(self) -> None:
         self.queue.clear()
 
@@ -98,6 +107,10 @@ class MinHeap(BoundedCollection[T]):
     @property
     def maxlen(self) -> Optional[int]:
         return self._maxlen
+
+    @property
+    def data(self) -> list[T]:
+        return self.heap
 
     @property
     def min(self) -> Optional[T]:
@@ -213,21 +226,17 @@ class QueueingNode(Node[T]):
             else:
                 self.queue.push(item)
         else:
-            channel = Channel(item=item, next_time=self._predict_next_time(item=item))
-            self._before_add_channel_hook()
-            self.channels.push(channel)
-            self.next_time = self.channels.min.next_time
+            channel = Channel[T](item=item, next_time=self._predict_item_time(item=item))
+            self.add_channel(channel)
 
     def end_action(self) -> None:
         item = self.channels.pop().item
         if not self.queue.is_empty:
             next_item = self.queue.pop()
-            channel = Channel(item=next_item, next_time=self._predict_next_time(item=next_item))
-            self._before_add_channel_hook()
-            self.channels.push(channel)
-
-        next_channel = self.channels.min
-        self.next_time = INF_TIME if next_channel is None else next_channel.next_time
+            channel = Channel[T](item=next_item, next_time=self._predict_item_time(item=next_item))
+            self.add_channel(channel)
+        else:
+            self.next_time = self._predict_next_time()
         return self._end_action(item)
 
     def reset(self) -> None:
@@ -235,6 +244,18 @@ class QueueingNode(Node[T]):
         self.next_time = INF_TIME
         self.queue.clear()
         self.channels.clear()
+
+    def add_channel(self, channel: Channel[T]) -> None:
+        self._before_add_channel_hook(channel)
+        self.channels.push(channel)
+        self.next_time = self._predict_next_time()
+
+    def _predict_item_time(self, **kwargs: Any) -> float:
+        return self.current_time + self._get_delay(**kwargs)
+
+    def _predict_next_time(self, **_: Any) -> float:
+        next_channel = self.channels.min
+        return INF_TIME if next_channel is None else next_channel.next_time
 
     def _before_time_update_hook(self, time: float) -> None:
         dtime = time - self.current_time
@@ -253,7 +274,7 @@ class QueueingNode(Node[T]):
             self.metrics.in_interval += self.current_time - self.metrics.in_time
         self.metrics.in_time = self.current_time
 
-    def _before_add_channel_hook(self) -> None:
+    def _before_add_channel_hook(self, _: Channel[T]) -> None:
         pass
 
     def _failure_hook(self) -> None:

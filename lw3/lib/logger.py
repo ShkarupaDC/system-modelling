@@ -51,7 +51,7 @@ class Logger(BaseLogger[T]):
     def base_factory_node(self, node: BaseFactoryNode[T]) -> str:
         return self._base_node(
             node, f'next_time={self.float(node.next_time)}, '
-            f'item={node.item}, '
+            f'item={node.item}, ' +
             f'created={self.float(node.item.created_time)}' if isinstance(node.item, Item) else '')
 
     def channel(self, channel: Channel) -> str:
@@ -60,10 +60,10 @@ class Logger(BaseLogger[T]):
     def channels(self, channels: MinHeap[Channel]) -> str:
         return ('Channels('
                 f'max_channels={channels.maxlen}, '
-                f"channels=[{', '.join(self.channel(channel) for channel in channels.heap)}])")
+                f"channels=[{', '.join(self.channel(channel) for channel in channels.data)}])")
 
     def queue(self, queue: Queue[T]) -> str:
-        return f'Queue(max_size={queue.maxlen}, items={list(queue.queue)})'
+        return f'Queue(max_size={queue.maxlen}, items={list(queue.data)})'
 
     def queueing_node(self, node: QueueingNode[T]) -> str:
         return self._base_node(
@@ -121,7 +121,7 @@ class Logger(BaseLogger[T]):
         print(f'{self.dashed_line(31)}State{self.dashed_line(31)}')
         if nodes:
             updated = [node.name for node in sorted(updated_nodes, key=lambda node: node.name)]
-            print(f'{self.float(time)}. Happened: {updated}. After:')
+            print(f'{self.float(time)}. End action happened: {updated}. After:')
             print('\n'.join(self.get_node_logger(node)(node) for node in sorted(nodes, key=lambda node: node.name)))
 
     def log_metrics(self, model_metrics: ModelMetrics[Model[T]], nodes_metrics: list[NodeMetrics[Node[T]]],
