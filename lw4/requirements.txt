@@ -1,2 +1,3 @@
+../qnet
 matplotlib==3.6.1
 tqdm==4.64.1

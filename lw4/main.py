@@ -3,7 +3,6 @@ import math
 import random
 from functools import partial
 import time
-import sys
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Type, Any
@@ -12,15 +11,12 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
-sys.path.append(str(Path(__file__).parents[1].joinpath('lw3')))
-
-# pylint: disable=wrong-import-position, import-error
-from lib.base import Node, Item
-from lib.factory import FactoryNode
-from lib.queueing import Channel, QueueingNode, QueueingMetrics
-from lib.transition import ProbaTransitionNode
-from lib.model import Model, Verbosity, Evaluation
-from lib.logger import _format_float
+from qnet.base import Node, Item
+from qnet.factory import FactoryNode
+from qnet.queueing import Channel, QueueingNode, QueueingMetrics
+from qnet.transition import ProbaTransitionNode
+from qnet.model import Model, Verbosity, Evaluation
+from qnet.logger import _format_float
 
 ELEMENTARY_OPERATION_TIME = 1e-6  # in seconds
 

@@ -1,6 +1,6 @@
-from lib.common import T
-from lib.base import Node, Metrics
-from lib.logger import NodeLoggerDispatcher, MetricLoggerDispatcher, Logger
+from qnet.common import T
+from qnet.base import Node, Metrics
+from qnet.logger import NodeLoggerDispatcher, MetricLoggerDispatcher, Logger
 
 from .queueing import BQ, BankQueueingMetrics
 from .transition import BankTransitionNode

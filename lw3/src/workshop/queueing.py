@@ -1,6 +1,6 @@
 from typing import Any
 
-from lib.queueing import QueueingNode
+from qnet.queueing import QueueingNode
 
 from .base import CarUnit
 

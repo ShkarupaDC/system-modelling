@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Type, TypeVar, Any
 
-from lib.common import T
-from lib.queueing import QueueingNode, QueueingMetrics
+from qnet.common import T
+from qnet.queueing import QueueingNode, QueueingMetrics
 
 BQ = TypeVar('BQ', bound='BankQueueingNode')
 

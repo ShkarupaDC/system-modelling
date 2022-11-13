@@ -1,13 +1,13 @@
 import random
 from functools import partial
 
-from lib.base import Item
-from lib.queueing import Channel, Queue
-from lib.factory import FactoryNode
-from lib.model import Model, Evaluation
-from lib.logger import _format_float
-
 from src.bank import BankQueueingNode, BankTransitionNode, BankLogger
+
+from qnet.base import Item
+from qnet.queueing import Channel, Queue
+from qnet.factory import FactoryNode
+from qnet.model import Model, Evaluation
+from qnet.logger import _format_float
 
 
 def run_simulation() -> None:

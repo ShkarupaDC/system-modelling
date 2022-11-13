@@ -1,16 +1,11 @@
 import random
 from functools import partial
-import sys
-from pathlib import Path
 from typing import Any
 
-sys.path.append(str(Path(__file__).parents[1].joinpath('lw3')))
-
-# pylint: disable=wrong-import-position, import-error
-from lib.base import Item
-from lib.factory import FactoryNode
-from lib.queueing import QueueingNode, Queue
-from lib.model import Model
+from qnet.base import Item
+from qnet.factory import FactoryNode
+from qnet.queueing import QueueingNode, Queue
+from qnet.model import Model
 
 
 class BankFactoryNode(FactoryNode):

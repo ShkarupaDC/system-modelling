@@ -13,4 +13,7 @@ __pycache__
 # Env
 .venv
 
-
+# Distribution / packaging
+build/
+dist/
+*.egg-info/

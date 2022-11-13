@@ -1,7 +1,7 @@
 from enum import Enum
 from dataclasses import dataclass, field
 
-from lib.base import Item
+from qnet.base import Item
 
 
 class SickType(int, Enum):

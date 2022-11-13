@@ -1,4 +1,4 @@
-from lib.transition import ProbaTransitionNode
+from qnet.transition import ProbaTransitionNode
 
 from .base import CarUnit
 

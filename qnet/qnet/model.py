@@ -2,11 +2,11 @@ from enum import Flag, auto
 from dataclasses import dataclass, field
 from typing import Callable, Generic, Optional, Type, TypeVar, Any
 
-from lib.common import INF_TIME, TIME_EPS, T
-from lib.base import Node, Metrics, NodeMetrics
-from lib.factory import BaseFactoryNode
-from lib.queueing import QueueingNode
-from lib.logger import BaseLogger, Logger
+from qnet.common import INF_TIME, TIME_EPS, T
+from qnet.base import Node, Metrics, NodeMetrics
+from qnet.factory import BaseFactoryNode
+from qnet.queueing import QueueingNode
+from qnet.logger import BaseLogger, Logger
 
 M = TypeVar('M', bound='Model')
 

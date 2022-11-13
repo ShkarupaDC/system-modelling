@@ -2,7 +2,7 @@ import random
 from dataclasses import dataclass
 from typing import Type, Any
 
-from lib.factory import BaseFactoryNode, FactoryMetrics
+from qnet.factory import BaseFactoryNode, FactoryMetrics
 
 from .base import HospitalItem, SickType
 from .utils import MeanMeter

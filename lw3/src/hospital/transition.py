@@ -1,8 +1,8 @@
 from typing import Iterable, Optional, Any
 
-from lib.base import Node
-from lib.queueing import QueueingNode
-from lib.transition import BaseTransitionNode, ProbaTransitionNode
+from qnet.base import Node
+from qnet.queueing import QueueingNode
+from qnet.transition import BaseTransitionNode, ProbaTransitionNode
 
 from .base import HospitalItem, SickType
 

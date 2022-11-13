@@ -1,7 +1,7 @@
 import numpy.typing as npt
 
-from lib.base import Node, Metrics
-from lib.logger import MetricLoggerDispatcher, Logger
+from qnet.base import Node, Metrics
+from qnet.logger import MetricLoggerDispatcher, Logger
 
 from .base import CarUnit
 from .factory import CarUnitFactoryMetrics

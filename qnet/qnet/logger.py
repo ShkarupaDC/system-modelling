@@ -2,11 +2,11 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Callable, Generic
 
-from lib.common import T
-from lib.base import Item, Node, Metrics, NodeMetrics
-from lib.factory import BaseFactoryNode, FactoryMetrics
-from lib.queueing import Channel, MinHeap, Queue, QueueingNode, QueueingMetrics
-from lib.transition import BaseTransitionNode
+from qnet.common import T
+from qnet.base import Item, Node, Metrics, NodeMetrics
+from qnet.factory import BaseFactoryNode, FactoryMetrics
+from qnet.queueing import Channel, MinHeap, Queue, QueueingNode, QueueingMetrics
+from qnet.transition import BaseTransitionNode
 
 if TYPE_CHECKING:
     from .model import Model, EvaluationReport, ModelMetrics

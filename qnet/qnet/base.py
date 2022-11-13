@@ -4,7 +4,7 @@ import inspect
 from dataclasses import dataclass, field, fields, _MISSING_TYPE
 from typing import Callable, Generic, Iterable, Optional, Type, Any
 
-from lib.common import T
+from qnet.common import T
 
 DelayFn = Callable[..., float]
 

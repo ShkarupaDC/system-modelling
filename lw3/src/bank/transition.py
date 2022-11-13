@@ -1,8 +1,8 @@
 from typing import Iterable, Optional, Any
 
-from lib.common import T
-from lib.base import Node
-from lib.transition import BaseTransitionNode
+from qnet.common import T
+from qnet.base import Node
+from qnet.transition import BaseTransitionNode
 
 from .queueing import BankQueueingNode
 

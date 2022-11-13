@@ -1,12 +1,12 @@
 import random
 from functools import partial
 
-from lib.common import erlang
-from lib.model import Evaluation, Model
-from lib.queueing import Channel, QueueingNode, PriorityQueue
-from lib.logger import _format_float
-
 from src.workshop import CarUnit, CarUnitFactory, RepairQueueingNode, AfterControlTransition, WorkshopLogger
+
+from qnet.common import erlang
+from qnet.model import Evaluation, Model
+from qnet.queueing import Channel, QueueingNode, PriorityQueue
+from qnet.logger import _format_float
 
 
 def run_simulation() -> None:

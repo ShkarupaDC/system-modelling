@@ -6,8 +6,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Callable, Iterable, Optional, Generic, Type, TypeVar, Any
 
-from lib.common import INF_TIME, TIME_EPS, T
-from lib.base import Node, NodeMetrics
+from qnet.common import INF_TIME, TIME_EPS, T
+from qnet.base import Node, NodeMetrics
 
 Q = TypeVar('Q', bound='QueueingNode')
 

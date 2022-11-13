@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from lib.base import Item
+from qnet.base import Item
 
 
 @dataclass(eq=False)

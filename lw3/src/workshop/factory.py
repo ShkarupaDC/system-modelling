@@ -5,8 +5,8 @@ from typing import Type, Any
 import numpy as np
 import numpy.typing as npt
 
-from lib.base import ActionType
-from lib.factory import FactoryMetrics, BaseFactoryNode
+from qnet.base import ActionType
+from qnet.factory import FactoryMetrics, BaseFactoryNode
 
 from .base import CarUnit
 from .queueing import RepairQueueingNode

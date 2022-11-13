@@ -4,8 +4,8 @@ from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import Type, TypeVar, Any
 
-from lib.common import T
-from lib.base import Node, NodeMetrics, Item
+from qnet.common import T
+from qnet.base import Node, NodeMetrics, Item
 
 I = TypeVar('I', bound='Item')
 

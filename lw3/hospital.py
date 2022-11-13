@@ -1,12 +1,12 @@
 import random
 from functools import partial
 
-from lib.common import erlang
-from lib.queueing import PriorityQueue, QueueingNode
-from lib.model import Model
-
 from src.hospital import (HospitalItem, SickType, HospitalFactoryNode, TestingTransitionNode, EmergencyTransitionNode,
                           HospitalLogger)
+
+from qnet.common import erlang
+from qnet.queueing import PriorityQueue, QueueingNode
+from qnet.model import Model
 
 
 def run_simulation() -> None:
