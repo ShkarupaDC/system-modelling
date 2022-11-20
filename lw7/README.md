@@ -1,0 +1,3 @@
+## How to run
+
+You can run simulations using the [PetriObjModelPaint](https://github.com/StetsenkoInna/PetriObjModelPaint) library. First, you should clone this repo, then follow the installation guide. Second, you should extend the [NetLibrary class](https://github.com/StetsenkoInna/PetriObjModelPaint/blob/master/src/LibNet/NetLibrary.java) with the methods provided in [NetLibrary.java](/lw7/NetLibrary.java) file. Third, you should put [ManufacturingSystem.java](/lw7/ManufacturingSystem.java) and [TransportSystem.java](/lw7/TransportSystem.java) into the [LibTest](https://github.com/StetsenkoInna/PetriObjModelPaint/tree/master/src/LibTest) directory. Finally, you can run both files as any other Java application
