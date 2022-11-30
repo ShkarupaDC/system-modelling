@@ -1,18 +1,21 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Callable, Generic
+from collections.abc import Mapping, Iterable
+from typing import TYPE_CHECKING, Callable, Generic, Any
+
+import prettytable as pt
 
 from qnet.common import T
 from qnet.base import Item, Node, Metrics, NodeMetrics
 from qnet.factory import BaseFactoryNode, FactoryMetrics
-from qnet.queueing import Channel, MinHeap, Queue, QueueingNode, QueueingMetrics
+from qnet.queueing import Channel, BoundedCollection, QueueingNode, QueueingMetrics
 from qnet.transition import BaseTransitionNode
 
 if TYPE_CHECKING:
     from .model import Model, EvaluationReport, ModelMetrics
 
-NodeLoggerDispatcher = Callable[[Node[T]], str]
-MetricLoggerDispatcher = Callable[[Metrics[Node[T]]], str]
+NodeLoggerDispatcher = Callable[[Node[T]], dict[str, Any]]
+MetricLoggerDispatcher = Callable[[Metrics[Node[T]]], dict[str, Any]]
 
 
 def _format_float(value: float, precision: str = 3) -> str:
@@ -22,118 +25,164 @@ def _format_float(value: float, precision: str = 3) -> str:
 class BaseLogger(ABC, Generic[T]):
 
     @abstractmethod
-    def log_state(self, time: float, nodes: list[Node[T]], updated_nodes: list[Node[T]]) -> None:
+    def nodes_states(self, time: float, nodes: list[Node[T]], updated_nodes: list[Node[T]]) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def log_metrics(self, model_metrics: ModelMetrics[Model[T]], nodes_metrics: list[NodeMetrics[Node[T]]],
-                    evaluations: list[EvaluationReport]) -> None:
+    def model_metrics(self, model_metrics: ModelMetrics[Model[T]]) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def nodes_metrics(self, nodes_metrics: list[NodeMetrics[Node[T]]]) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def evaluation_reports(self, evaluation_reports: list[EvaluationReport]) -> None:
         raise NotImplementedError
 
 
-class Logger(BaseLogger[T]):
+class CLILogger(BaseLogger[T]):
 
-    def __init__(self, precision: int = 3) -> None:
+    def __init__(self, precision: int = 3, max_column_width: int = 60, max_table_width: int = 100) -> None:
         self.precision = precision
+        self.max_column_width = max_column_width
+        self.max_table_width = max_table_width
 
-    def float(self, value: float) -> str:
-        return _format_float(value, self.precision)
+    # Formatters
+    def _format(self, value: Any) -> str:
+        class_name = value.__class__.__name__
+        if isinstance(value, Channel):
+            return f'{class_name}({self._format(self._channel(value))})'
+        if isinstance(value, BoundedCollection):
+            return f'{class_name}({self._format(self._bounded_collection(value))})'
+        if isinstance(value, Mapping):
+            return self._format_dict(value)
+        if isinstance(value, Iterable) and not isinstance(value, str):
+            return self._format_iter(value)
+        if isinstance(value, float):
+            return _format_float(value, self.precision)
+        return str(value)
 
-    def dashed_line(self, length: int) -> str:
-        return '-' * length
+    def _format_dict(self,
+                     dict_: Mapping,
+                     join_chars: str = ', ',
+                     split_chars: str = '=',
+                     start_chars: str = '') -> str:
+        dict_str = join_chars.join(f'{key}{split_chars}{self._format(value)}' for key, value in dict_.items())
+        return f'{start_chars}{dict_str}'
 
-    def _base_node(self, node: Node[T], addon: str) -> str:
-        return f'{node.name}({addon})'
+    def _format_iter(self, iter_: Iterable, join_chars: str = ', ', with_braces: bool = True) -> str:
+        iter_str = join_chars.join(map(self._format, iter_))
+        return f'[{iter_str}]' if with_braces else iter_str
 
-    def node(self, node: Node[T]) -> str:
-        return self._base_node(node, f'next_time={self.float(node.next_time)}')
+    # Other
+    def _channel(self, channel: Channel) -> dict[str, Any]:
+        return {'item': channel.item, 'next_time': channel.next_time}
 
-    def base_factory_node(self, node: BaseFactoryNode[T]) -> str:
-        return self._base_node(
-            node, f'next_time={self.float(node.next_time)}, '
-            f'item={node.item}, ' +
-            f'created={self.float(node.item.created_time)}' if isinstance(node.item, Item) else '')
+    def _bounded_collection(self, collection: BoundedCollection[T]) -> dict[str, Any]:
+        return {'max_size': collection.maxlen, 'items': list(collection.data)}
 
-    def channel(self, channel: Channel) -> str:
-        return f'Channel(item={channel.item}, next_time={self.float(channel.next_time)})'
+    # Node state
+    def _node(self, node: Node[T]) -> dict[str, Any]:
+        return {'next_time': node.next_time}
 
-    def channels(self, channels: MinHeap[Channel]) -> str:
-        return ('Channels('
-                f'max_channels={channels.maxlen}, '
-                f"channels=[{', '.join(self.channel(channel) for channel in channels.data)}])")
+    def _base_factory_node(self, node: BaseFactoryNode[T]) -> dict[str, Any]:
+        node_dict = self._node(node)
+        node_dict['item'] = node.item
+        if isinstance(node.item, Item):
+            node_dict['created'] = node.item.created_time
+        return node_dict
 
-    def queue(self, queue: Queue[T]) -> str:
-        return f'Queue(max_size={queue.maxlen}, items={list(queue.data)})'
+    def _queueing_node(self, node: QueueingNode[T]) -> dict[str, Any]:
+        node_dict = self._node(node)
+        node_dict.update({'channels': node.channels, 'queue': node.queue, 'num_failures': node.metrics.num_failures})
+        return node_dict
 
-    def queueing_node(self, node: QueueingNode[T]) -> str:
-        return self._base_node(
-            node, f'next_time={self.float(node.next_time)}, '
-            f'channels={self.channels(node.channels)}, '
-            f'queue={self.queue(node.queue)}, '
-            f'num_failures={node.metrics.num_failures}')
+    def _base_transition_node(self, node: BaseTransitionNode[T]) -> dict[str, Any]:
+        return {'item': node.item, 'next_node': node.next_node.name if node.next_node else None}
 
-    def base_transition_node(self, node: BaseTransitionNode[T]) -> str:
-        return self._base_node(node, f'item={node.item}, '
-                               f'next_node={node.next_node.name if node.next_node else None}')
-
-    def get_node_logger(self, node: Node[T]) -> NodeLoggerDispatcher:
+    def _dispatch_node_logger(self, node: Node[T]) -> NodeLoggerDispatcher:
         if isinstance(node, QueueingNode):
-            return self.queueing_node
+            return self._queueing_node
         if isinstance(node, BaseTransitionNode):
-            return self.base_transition_node
+            return self._base_transition_node
         if isinstance(node, BaseFactoryNode):
-            return self.base_factory_node
+            return self._base_factory_node
         if isinstance(node, Node):
-            return self.node
+            return self._node
         raise RuntimeError(f'{type(node)} must be inherited from "Node"')
 
-    def node_metrics(self, metrics: NodeMetrics[Node[T]]) -> str:
-        return f'Num in items: {metrics.num_in}. Num out items: {metrics.num_out}'
+    # Node metrics
+    def _node_metrics(self, metrics: NodeMetrics[Node[T]]) -> dict[str, Any]:
+        return {'num_in_items': metrics.num_in, 'num_out_items': metrics.num_out}
 
-    def factory_metrics(self, metrics: FactoryMetrics[T]) -> str:
-        return (f'{self.node_metrics(metrics)}. '
-                f'Mean time in system: {self.float(metrics.mean_time)}')
+    def _factory_metrics(self, metrics: FactoryMetrics[T]) -> dict[str, Any]:
+        metrics_dict = self._node_metrics(metrics)
+        metrics_dict['mean_time_in_system'] = metrics.mean_time
+        return metrics_dict
 
-    def queueing_metrics(self, metrics: QueueingMetrics[T]) -> str:
-        return (f'{self.node_metrics(metrics)}. '
-                f'Mean interval between input actions: {self.float(metrics.mean_in_interval)}. '
-                f'Mean interval between output actions: {self.float(metrics.mean_out_interval)}. '
-                f'Mean queue size: {self.float(metrics.mean_queuelen)}. '
-                f'Mean busy channels: {self.float(metrics.mean_busy_channels)}. '
-                f'Mean wait time: {self.float(metrics.mean_wait_time)}. '
-                f'Mean processing time: {self.float(metrics.mean_busy_time)}. '
-                f'Failure probability: {self.float(metrics.failure_proba)}')
+    def _queueing_metrics(self, metrics: QueueingMetrics[T]) -> dict[str, Any]:
+        metrics_dict = self._node_metrics(metrics)
+        metrics_dict.update({
+            'mean_interval_between_in_actions': metrics.mean_in_interval,
+            'mean_interval_between_out_actions': metrics.mean_out_interval,
+            'mean_queue_size': metrics.mean_queuelen,
+            'mean_busy_channels': metrics.mean_busy_channels,
+            'mean_wait_time': metrics.mean_wait_time,
+            'mean_processing_time': metrics.mean_busy_time,
+            'failure_probability': metrics.failure_proba,
+        })
+        return metrics_dict
 
-    def get_metrics_logger(self, metrics: NodeMetrics[Node[T]]) -> MetricLoggerDispatcher:
+    def _dispatch_metrics_logger(self, metrics: NodeMetrics[Node[T]]) -> MetricLoggerDispatcher:
         if isinstance(metrics, QueueingMetrics):
-            return self.queueing_metrics
+            return self._queueing_metrics
         if isinstance(metrics, FactoryMetrics):
-            return self.factory_metrics
+            return self._factory_metrics
         if isinstance(metrics, NodeMetrics):
-            return self.node_metrics
-        raise RuntimeError(f'{type(metrics)} must be inherited from "Metrics"')
+            return self._node_metrics
+        raise RuntimeError(f'{type(metrics)} must be inherited from "NodeMetrics"')
 
-    def model_metrics(self, metrics: ModelMetrics[Model[T]]) -> str:
-        return (f'Num events: {metrics.num_events}. '
-                f'Mean event intensity {self.float(metrics.mean_event_intensity)}')
+    # Model metrics
+    def _model_metrics(self, metrics: ModelMetrics[Model[T]]) -> dict[str, Any]:
+        return {'mum_events': metrics.num_events, 'mean_event_intensity': metrics.mean_event_intensity}
 
-    def log_state(self, time: float, nodes: list[Node[T]], updated_nodes: list[Node[T]]) -> None:
-        print(f'{self.dashed_line(31)}State{self.dashed_line(31)}')
-        if nodes:
-            updated = [node.name for node in sorted(updated_nodes, key=lambda node: node.name)]
-            print(f'{self.float(time)}. End action happened: {updated}. After:')
-            print('\n'.join(self.get_node_logger(node)(node) for node in sorted(nodes, key=lambda node: node.name)))
+    # Interface
+    def nodes_states(self, time: float, nodes: list[Node[T]], updated_nodes: list[Node[T]]) -> None:
+        table = pt.PrettyTable(field_names=['Node', 'State', 'Updated'],
+                               align='l',
+                               max_width=self.max_column_width,
+                               max_table_width=self.max_table_width)
+        updated_names = {node.name for node in updated_nodes}
+        for node in nodes:
+            state_dict = self._dispatch_node_logger(node)(node)
+            table.add_row([node.name, self._format(state_dict), '+' if node.name in updated_names else '-'])
+        print(f'Time: {_format_float(time, self.precision)}')
+        print(table.get_string(title='Nodes States', hrules=pt.ALL, sortby='Node'))
 
-    def log_metrics(self, model_metrics: ModelMetrics[Model[T]], nodes_metrics: list[NodeMetrics[Node[T]]],
-                    evaluations: list[EvaluationReport]) -> None:
-        print(f'{self.dashed_line(30)}Metrics{self.dashed_line(30)}')
+    def model_metrics(self, model_metrics: ModelMetrics[Model[T]]) -> None:
+        table = pt.PrettyTable(field_names=['Metrics'],
+                               align='l',
+                               max_width=self.max_column_width,
+                               max_table_width=self.max_table_width)
+        table.add_row([self._format_dict(self._model_metrics(model_metrics), join_chars='\n', split_chars=': ')])
+        print(table.get_string(title='Model Metrics'))
 
-        print(f'Model Metrics:\n{self.model_metrics(model_metrics)}\n{self.dashed_line(30)}')
-        if nodes_metrics:
-            sorted_metrics = sorted(nodes_metrics, key=lambda metrics: metrics.parent.name)
-            print(f'\n{self.dashed_line(30)}\n'.join(
-                f'{metrics.parent.name}:\n{self.get_metrics_logger(metrics)(metrics)}' for metrics in sorted_metrics))
-        if evaluations:
-            print(f'{self.dashed_line(30)}\nExternal Evaluations:')
-            print('. '.join(f'{evaluation.name}: {evaluation.report}'
-                            for evaluation in sorted(evaluations, key=lambda evaluation: evaluation.name)))
+    def nodes_metrics(self, nodes_metrics: list[NodeMetrics[Node[T]]]) -> None:
+        table = pt.PrettyTable(field_names=['Node', 'Metrics'],
+                               align='l',
+                               max_width=self.max_column_width,
+                               max_table_width=self.max_table_width)
+        for metrics in nodes_metrics:
+            metrics_dict = self._dispatch_metrics_logger(metrics)(metrics)
+            table.add_row([metrics.parent.name, self._format_dict(metrics_dict, join_chars='\n', split_chars=": ")])
+        print(table.get_string(title='Nodes Metrics', hrules=pt.ALL, sortby='Node'))
+
+    def evaluation_reports(self, evaluation_reports: list[EvaluationReport]) -> None:
+        table = pt.PrettyTable(field_names=['Report', 'Result'],
+                               align='l',
+                               max_width=self.max_column_width,
+                               max_table_width=self.max_table_width)
+        for report in evaluation_reports:
+            table.add_row([report.name, self._format(report.result)])
+        print(table.get_string(title='Evaluation Reports', hrules=pt.ALL, sortby='Report'))

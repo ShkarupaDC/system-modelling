@@ -47,6 +47,7 @@ class Item:
 @dataclass(eq=False)
 class Metrics(Generic[T]):
     parent: T
+    passed_time: float = field(init=False, default=0)
 
     def reset(self) -> None:
         for param in fields(self):
@@ -105,10 +106,13 @@ class Node(ABC, Generic[T]):
         if node is not None:
             node.prev_node = self
 
+    def reset_metrics(self) -> None:
+        self.metrics.reset()
+
     def reset(self) -> None:
         self.current_time = 0
         self.next_time = 0
-        self.metrics.reset()
+        self.reset_metrics()
 
     def _get_auto_name(self) -> str:
         return f'{self.__class__.__name__}{self.num_nodes}'
@@ -139,5 +143,5 @@ class Node(ABC, Generic[T]):
     def _item_out_hook(self, _: T) -> None:
         self.metrics.num_out += 1
 
-    def _before_time_update_hook(self, _: float) -> None:
-        pass
+    def _before_time_update_hook(self, time: float) -> None:
+        self.metrics.passed_time += time - self.current_time

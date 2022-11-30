@@ -19,6 +19,12 @@ class RepairInfo:
 
 
 @dataclass(eq=False)
+class Histogram:
+    values: npt.NDArray[np.float32]
+    bin_edges: npt.NDArray[np.float32]
+
+
+@dataclass(eq=False)
 class CarUnitFactoryMetrics(FactoryMetrics[CarUnit]):
 
     @property
@@ -50,8 +56,8 @@ class CarUnitFactoryMetrics(FactoryMetrics[CarUnit]):
                                 for info in repair_infos.values()) if (repair_infos := self.repair_info_per_unit) else 0
 
     @property
-    def repair_time_histogram(self) -> tuple[npt.NDArray, npt.NDArray]:
-        return np.histogram(list(info.time for info in self.repair_info_per_unit.values()))
+    def repair_time_histogram(self) -> Histogram:
+        return Histogram(*np.histogram(list(info.time for info in self.repair_info_per_unit.values())))
 
     @property
     def mean_num_repairs(self) -> float:
@@ -64,8 +70,8 @@ class CarUnitFactoryMetrics(FactoryMetrics[CarUnit]):
                                 for info in repair_infos.values()) if (repair_infos := self.repair_info_per_unit) else 0
 
     @property
-    def num_repairs_histogram(self) -> tuple[npt.NDArray, npt.NDArray]:
-        return np.histogram(list(info.num_repairs for info in self.repair_info_per_unit.values()))
+    def num_repairs_histogram(self) -> Histogram:
+        return Histogram(*np.histogram(list(info.num_repairs for info in self.repair_info_per_unit.values())))
 
 
 class CarUnitFactory(BaseFactoryNode[CarUnit]):

@@ -2,11 +2,11 @@ import random
 from functools import partial
 
 from src.hospital import (HospitalItem, SickType, HospitalFactoryNode, TestingTransitionNode, EmergencyTransitionNode,
-                          HospitalLogger)
+                          HospitalCLILogger)
 
 from qnet.common import erlang
 from qnet.queueing import PriorityQueue, QueueingNode
-from qnet.model import Model
+from qnet.model import Model, Nodes
 
 
 def run_simulation() -> None:
@@ -42,7 +42,7 @@ def run_simulation() -> None:
     on_testing.set_next_node(testing_transition)
     testing_transition.add_next_node(at_emergency, proba=0.2)
 
-    model = Model.from_factory(incoming_sick_people, logger=HospitalLogger())
+    model = Model(nodes=Nodes.from_node_tree_root(incoming_sick_people), logger=HospitalCLILogger())
     model.simulate(end_time=100000)
 
 

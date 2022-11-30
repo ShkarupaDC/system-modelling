@@ -172,11 +172,11 @@ class QueueingMetrics(NodeMetrics[Q]):
 
     @property
     def mean_queuelen(self) -> float:
-        return self.wait_time / max(self.parent.current_time, TIME_EPS)
+        return self.wait_time / max(self.passed_time, TIME_EPS)
 
     @property
     def mean_busy_channels(self) -> float:
-        return self.busy_time / max(self.parent.current_time, TIME_EPS)
+        return self.busy_time / max(self.passed_time, TIME_EPS)
 
     @property
     def failure_proba(self) -> float:
@@ -258,6 +258,7 @@ class QueueingNode(Node[T]):
         return INF_TIME if next_channel is None else next_channel.next_time
 
     def _before_time_update_hook(self, time: float) -> None:
+        super()._before_time_update_hook(time)
         dtime = time - self.current_time
         self.metrics.wait_time += self.queuelen * dtime
         self.metrics.busy_time += self.num_channels * dtime

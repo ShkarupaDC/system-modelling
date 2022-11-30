@@ -15,8 +15,7 @@ from qnet.base import Node, Item
 from qnet.factory import FactoryNode
 from qnet.queueing import Channel, QueueingNode, QueueingMetrics
 from qnet.transition import ProbaTransitionNode
-from qnet.model import Model, Verbosity, Evaluation
-from qnet.logger import _format_float
+from qnet.model import Model, Nodes, Verbosity, Evaluation
 
 ELEMENTARY_OPERATION_TIME = 1e-6  # in seconds
 
@@ -44,22 +43,23 @@ def create_model(num_nodes: int, factory_time: float, queueing_time: float, prev
 
     node_idx = 2
     for idx in range(num_nodes):
-        node = SystemQueueingNode(name=f'{node_idx:0{num_digits}d}. Queueing',
-                                  max_channels=1,
-                                  delay_fn=partial(random.expovariate, lambd=1.0 / queueing_time))
+        next_node = SystemQueueingNode(name=f'{node_idx:0{num_digits}d}. Queueing',
+                                       max_channels=1,
+                                       delay_fn=partial(random.expovariate, lambd=1.0 / queueing_time))
         node_idx += 1
         if idx >= 1:
-            next_node = ProbaTransitionNode[Item](name=f'{node_idx:0{num_digits}d}. Previous vs Next')
-            next_node.add_next_node(prev_node, proba=prev_proba)
-            next_node.add_next_node(node, proba=1.0 - prev_proba)
+            node = ProbaTransitionNode[Item](name=f'{node_idx:0{num_digits}d}. Previous vs Next')
             node_idx += 1
+            node.add_next_node(prev_node.prev_node, proba=prev_proba)
+            node.add_next_node(next_node, proba=1.0 - prev_proba)
+            prev_node.set_next_node(node)
         else:
-            next_node = node
-        prev_node.set_next_node(next_node)
-        prev_node = node
+            prev_node.set_next_node(next_node)
+        prev_node = next_node
 
     def num_elementary_operations(model: Model[Item]) -> float:
-        num_channels_history = itertools.chain.from_iterable(node.metrics.num_channels_history for node in model.nodes
+        num_channels_history = itertools.chain.from_iterable(node.metrics.num_channels_history
+                                                             for node in model.nodes.values()
                                                              if isinstance(node, SystemQueueingNode))
         num_insert_operations = [
             num_channels if num_channels <= 1 else math.log2(num_channels) for num_channels in num_channels_history
@@ -67,23 +67,20 @@ def create_model(num_nodes: int, factory_time: float, queueing_time: float, prev
         mean_num_insert_operations = sum(num_insert_operations) / len(num_insert_operations)
         return 2 * (1 + mean_num_insert_operations)
 
-    model = Model[Item].from_factory(factory=factory,
-                                     evaluations=[
-                                         Evaluation[float](name='Num elementary operations',
-                                                           evaluate=num_elementary_operations,
-                                                           serialize=_format_float)
-                                     ])
+    model = Model[Item](
+        nodes=Nodes.from_node_tree_root(factory),
+        evaluations=[Evaluation[float](name='num_elementary_operations', evaluate=num_elementary_operations)])
     return model
 
 
 def run_simulation(model: Model[Item], simulation_time: float) -> tuple[float, float]:
     start_time = time.perf_counter()
-    metrics, _, evaluations = model.simulate(end_time=simulation_time, verbosity=Verbosity.NONE)
+    model.simulate(end_time=simulation_time, verbosity=Verbosity.NONE)
     end_time = time.perf_counter()
     measured_time = end_time - start_time
 
-    num_elem_operations: float = evaluations[0].result
-    predicted_time = metrics.mean_event_intensity * metrics.num_events * num_elem_operations * ELEMENTARY_OPERATION_TIME
+    num_elem_operations: float = model.evaluation_reports[0].result
+    predicted_time = model.model_metrics.mean_event_intensity * model.model_metrics.num_events * num_elem_operations * ELEMENTARY_OPERATION_TIME
     return measured_time, predicted_time
 
 

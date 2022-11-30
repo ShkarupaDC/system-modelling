@@ -5,7 +5,7 @@ from typing import Any
 from qnet.base import Item
 from qnet.factory import FactoryNode
 from qnet.queueing import QueueingNode, Queue
-from qnet.model import Model
+from qnet.model import Model, Nodes
 
 
 class BankFactoryNode(FactoryNode):
@@ -24,7 +24,6 @@ class BankFactoryNode(FactoryNode):
         self.operator = operator
         self.cachier = cachier
 
-    # pylint: disable=attribute-defined-outside-init
     def end_action(self) -> Item:
         self.item = self._get_next_item()
         self.metrics.items.append(self.item)
@@ -55,7 +54,7 @@ def run_simulation() -> None:
     factory.set_next_node(operator)
     operator.set_next_node(cachier)
 
-    model = Model.from_factory(factory)
+    model = Model(nodes=Nodes.from_node_tree_root(factory))
     model.simulate(end_time=1000)  # verbosity=Verbosity.METRICS | Verbosity.STATE
 
 

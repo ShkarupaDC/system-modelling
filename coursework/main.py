@@ -1,12 +1,11 @@
 import random
 from functools import partial
 
-from src.workshop import CarUnit, CarUnitFactory, RepairQueueingNode, AfterControlTransition, WorkshopLogger
+from workshop import CarUnit, CarUnitFactory, RepairQueueingNode, AfterControlTransition, WorkshopCLILogger
 
 from qnet.common import erlang
-from qnet.model import Evaluation, Model
+from qnet.model import Evaluation, Model, Nodes
 from qnet.queueing import Channel, QueueingNode, PriorityQueue
-from qnet.logger import _format_float
 
 
 def run_simulation() -> None:
@@ -42,14 +41,10 @@ def run_simulation() -> None:
         return (repair.metrics.mean_queuelen + repair.metrics.mean_busy_channels + control.metrics.mean_queuelen +
                 control.metrics.mean_busy_channels)
 
-    model = Model.from_factory(car_units,
-                               logger=WorkshopLogger(),
-                               evaluations=[
-                                   Evaluation[float](name='Mean units in system',
-                                                     evaluate=mean_units_in_system,
-                                                     serialize=_format_float)
-                               ])
-    model.simulate(end_time=1000)
+    model = Model(nodes=Nodes.from_node_tree_root(car_units),
+                  logger=WorkshopCLILogger(),
+                  evaluations=[Evaluation[float](name='mean_units_in_system', evaluate=mean_units_in_system)])
+    model.simulate(end_time=10000)
 
 
 if __name__ == '__main__':

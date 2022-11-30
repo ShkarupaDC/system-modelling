@@ -1,24 +1,23 @@
 import random
 from functools import partial
 
-from src.bank import BankQueueingNode, BankTransitionNode, BankLogger
+from src.bank import BankQueueingNode, BankTransitionNode, BankCLILogger
 
 from qnet.base import Item
 from qnet.queueing import Channel, Queue
 from qnet.factory import FactoryNode
-from qnet.model import Model, Evaluation
-from qnet.logger import _format_float
+from qnet.model import Model, Nodes, Evaluation, Verbosity
 
 
 def run_simulation() -> None:
     incoming_cars = FactoryNode(name='1. Incoming Cars', delay_fn=partial(random.expovariate, lambd=1.0 / 0.5))
     checkout1 = BankQueueingNode[Item](name='3. First checkout',
-                                       min_diff=2,
+                                       min_queuelen_diff=2,
                                        queue=Queue(maxlen=3),
                                        max_channels=1,
                                        delay_fn=partial(random.expovariate, lambd=1.0 / 0.3))
     checkout2 = BankQueueingNode[Item](name='4. Second checkout',
-                                       min_diff=2,
+                                       min_queuelen_diff=2,
                                        queue=Queue(maxlen=3),
                                        max_channels=1,
                                        delay_fn=partial(random.expovariate, lambd=1.0 / 0.3))
@@ -50,18 +49,14 @@ def run_simulation() -> None:
         metrics2 = checkout2.metrics
         return metrics1.mean_busy_channels + metrics1.mean_queuelen + metrics2.mean_busy_channels + metrics2.mean_queuelen
 
-    model = Model.from_factory(incoming_cars,
-                               evaluations=[
-                                   Evaluation[float](name='Total failure proba',
-                                                     evaluate=total_failure_proba,
-                                                     serialize=_format_float),
-                                   Evaluation[float](name='Mean number of cars in bank',
-                                                     evaluate=mean_cars_in_bank,
-                                                     serialize=_format_float),
-                                   Evaluation[int](name='Num switched checkout', evaluate=num_switched_checkout)
-                               ],
-                               logger=BankLogger())
-    model.simulate(end_time=10000)
+    model = Model(nodes=Nodes[Item].from_node_tree_root(incoming_cars),
+                  evaluations=[
+                      Evaluation[float](name='total_failure_proba', evaluate=total_failure_proba),
+                      Evaluation[float](name='mean_cars_in_bank', evaluate=mean_cars_in_bank),
+                      Evaluation[int](name='num_switched_checkout', evaluate=num_switched_checkout),
+                  ],
+                  logger=BankCLILogger())
+    model.simulate(end_time=10000, verbosity=Verbosity.METRICS)
 
 
 if __name__ == '__main__':

@@ -15,13 +15,13 @@ class BankQueueingMetrics(QueueingMetrics[BQ]):
 class BankQueueingNode(QueueingNode[T]):
 
     def __init__(self,
-                 min_diff: int,
+                 min_queuelen_diff: int,
                  metrics_type: Type[BankQueueingMetrics[BQ]] = BankQueueingMetrics,
                  **kwargs: Any) -> None:
         self.metrics: BankQueueingMetrics = None
         super().__init__(metrics_type=metrics_type, **kwargs)
 
-        self.min_diff = min_diff  # in queues' lengths
+        self.min_queuelen_diff = min_queuelen_diff
         self.neighbor: BankQueueingNode[T] = None
 
     def set_neighbor(self, node: 'BankQueueingNode[T]') -> None:
@@ -30,7 +30,7 @@ class BankQueueingNode(QueueingNode[T]):
 
     def end_action(self) -> None:
         item = super().end_action()
-        while self.neighbor.queuelen - self.queuelen >= self.min_diff:
+        while self.neighbor.queuelen - self.queuelen >= self.min_queuelen_diff:
             last_item = self.neighbor.queue.pop()
             self.neighbor._item_in_hook(last_item)
             self.queue.push(last_item)

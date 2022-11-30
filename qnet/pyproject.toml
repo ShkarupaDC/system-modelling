@@ -10,3 +10,4 @@ requires-python = ">=3.9"
 keywords = ["queueing-network", "discrete-event-simulation"]
 license = { text = "MIT License" }
 authors = [{ "name" = "Dmytro Shkarupa", "email" = "dimon.shkarupa@gmail.com" }]
+dependencies = ["prettytable >= 3.5.0"]
