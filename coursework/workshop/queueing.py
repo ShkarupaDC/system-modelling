@@ -1,11 +1,11 @@
 from typing import Any
 
-from qnet.queueing import QueueingNode
+from qnet.queueing import QM, QueueingNode
 
-from .base import CarUnit
+from .common import CarUnit
 
 
-class RepairQueueingNode(QueueingNode[CarUnit]):
+class RepairQueueingNode(QueueingNode[CarUnit, QM]):
 
     def _predict_item_time(self, **kwargs: Any) -> float:
         item: CarUnit = kwargs['item']

@@ -1,30 +1,23 @@
 from dataclasses import dataclass, field
-from typing import Type, TypeVar, Any
+from typing import Any
 
-from qnet.common import T
+from qnet.common import I
 from qnet.queueing import QueueingNode, QueueingMetrics
-
-BQ = TypeVar('BQ', bound='BankQueueingNode')
 
 
 @dataclass(eq=False)
-class BankQueueingMetrics(QueueingMetrics[BQ]):
+class BankQueueingMetrics(QueueingMetrics):
     num_from_neighbor: int = field(init=False, default=0)
 
 
-class BankQueueingNode(QueueingNode[T]):
+class BankQueueingNode(QueueingNode[I, BankQueueingMetrics]):
 
-    def __init__(self,
-                 min_queuelen_diff: int,
-                 metrics_type: Type[BankQueueingMetrics[BQ]] = BankQueueingMetrics,
-                 **kwargs: Any) -> None:
-        self.metrics: BankQueueingMetrics = None
-        super().__init__(metrics_type=metrics_type, **kwargs)
-
+    def __init__(self, min_queuelen_diff: int, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
         self.min_queuelen_diff = min_queuelen_diff
-        self.neighbor: BankQueueingNode[T] = None
+        self.neighbor: BankQueueingNode[I] = None
 
-    def set_neighbor(self, node: 'BankQueueingNode[T]') -> None:
+    def set_neighbor(self, node: 'BankQueueingNode[I]') -> None:
         self.neighbor = node
         node.neighbor = self
 

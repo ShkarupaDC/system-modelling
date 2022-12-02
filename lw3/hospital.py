@@ -1,37 +1,54 @@
 import random
 from functools import partial
 
-from src.hospital import (HospitalItem, SickType, HospitalFactoryNode, TestingTransitionNode, EmergencyTransitionNode,
-                          HospitalCLILogger)
+from src.hospital import (HospitalItem, SickType, HospitalFactoryNode, HospitalModelMetrics, TestingTransitionNode,
+                          EmergencyTransitionNode, HospitalCLILogger)
 
-from qnet.common import erlang
-from qnet.queueing import PriorityQueue, QueueingNode
+from qnet.common import PriorityQueue, Queue
+from qnet.node import NodeMetrics
+from qnet.dist import erlang
+from qnet.queueing import QueueingNode, QueueingMetrics
 from qnet.model import Model, Nodes
+
+
+def _priority_fn(item: HospitalItem) -> int:
+    return int(item.sick_type != SickType.FIRST and not item.as_first_sick)
 
 
 def run_simulation() -> None:
     # Processing nodes
     sick_type_probas = {SickType.FIRST: 0.5, SickType.SECOND: 0.1, SickType.THIRD: 0.4}
-    incoming_sick_people = HospitalFactoryNode(name='1. Sick people',
-                                               probas=sick_type_probas,
-                                               delay_fn=partial(random.expovariate, lambd=1.0 / 15))
+    incoming_sick_people = HospitalFactoryNode[NodeMetrics](name='1_sick_people',
+                                                            probas=sick_type_probas,
+                                                            metrics=NodeMetrics(),
+                                                            delay_fn=partial(random.expovariate, lambd=1.0 / 15))
     at_emergency_mean = {SickType.FIRST: 15, SickType.SECOND: 40, SickType.THIRD: 30}
-    at_emergency = QueueingNode[HospitalItem](
-        name='2. At Emergency',
-        queue=PriorityQueue[HospitalItem](
-            priority_fn=lambda item: int(item.sick_type != SickType.FIRST and not item.as_first_sick), fifo=True),
+    at_emergency = QueueingNode[HospitalItem, QueueingMetrics](
+        name='2_at_emergency',
+        queue=PriorityQueue[HospitalItem](priority_fn=_priority_fn, fifo=True),
+        metrics=QueueingMetrics(),
         max_channels=2,
         delay_fn=lambda item: random.expovariate(lambd=1.0 / at_emergency_mean[item.sick_type]))
-    emergency_transition = EmergencyTransitionNode(name='3. Chamber vs Reception')
-    to_chumber = QueueingNode[HospitalItem](name='4. To chumber',
-                                            max_channels=3,
-                                            delay_fn=partial(random.uniform, a=3, b=8))
-    to_reception = QueueingNode[HospitalItem](name='5. To reception', delay_fn=partial(random.uniform, a=2, b=5))
-    at_reception = QueueingNode[HospitalItem](name='6. At reception', delay_fn=partial(erlang, lambd=3 / 4.5, k=3))
-    on_testing = QueueingNode[HospitalItem](name='7. On Testing',
-                                            max_channels=2,
-                                            delay_fn=partial(erlang, lambd=2 / 4, k=2))
-    testing_transition = TestingTransitionNode(name='8. After Testing')
+    emergency_transition = EmergencyTransitionNode[NodeMetrics](name='3_chamber_vs_reception', metrics=NodeMetrics())
+    to_chumber = QueueingNode[HospitalItem, QueueingMetrics](name='4_to_chumber',
+                                                             queue=Queue[HospitalItem](),
+                                                             metrics=QueueingMetrics(),
+                                                             max_channels=3,
+                                                             delay_fn=partial(random.uniform, a=3, b=8))
+    to_reception = QueueingNode[HospitalItem, QueueingMetrics](name='5_to_reception',
+                                                               queue=Queue[HospitalItem](),
+                                                               metrics=QueueingMetrics(),
+                                                               delay_fn=partial(random.uniform, a=2, b=5))
+    at_reception = QueueingNode[HospitalItem, QueueingMetrics](name='6_at_reception',
+                                                               queue=Queue[HospitalItem](),
+                                                               metrics=QueueingMetrics(),
+                                                               delay_fn=partial(erlang, lambd=3 / 4.5, k=3))
+    on_testing = QueueingNode[HospitalItem, QueueingMetrics](name='7_on_testing',
+                                                             queue=Queue[HospitalItem](),
+                                                             metrics=QueueingMetrics(),
+                                                             max_channels=2,
+                                                             delay_fn=partial(erlang, lambd=2 / 4, k=2))
+    testing_transition = TestingTransitionNode[NodeMetrics](name='8_after_testing', metrics=NodeMetrics())
 
     # Connections
     incoming_sick_people.set_next_node(at_emergency)
@@ -42,7 +59,9 @@ def run_simulation() -> None:
     on_testing.set_next_node(testing_transition)
     testing_transition.add_next_node(at_emergency, proba=0.2)
 
-    model = Model(nodes=Nodes.from_node_tree_root(incoming_sick_people), logger=HospitalCLILogger())
+    model = Model(nodes=Nodes[HospitalItem].from_node_tree_root(incoming_sick_people),
+                  logger=HospitalCLILogger(),
+                  metrics=HospitalModelMetrics())
     model.simulate(end_time=100000)
 
 

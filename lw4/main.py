@@ -5,50 +5,52 @@ from functools import partial
 import time
 from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Type, Any
 
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
-from qnet.base import Node, Item
+from qnet.common import Item, Queue
+from qnet.node import Node, NodeMetrics
 from qnet.factory import FactoryNode
 from qnet.queueing import Channel, QueueingNode, QueueingMetrics
 from qnet.transition import ProbaTransitionNode
-from qnet.model import Model, Nodes, Verbosity, Evaluation
+from qnet.logger import CLILogger
+from qnet.model import Model, ModelMetrics, Nodes, Verbosity, Evaluation
 
 ELEMENTARY_OPERATION_TIME = 1e-6  # in seconds
 
 
 @dataclass(eq=False)
-class SystemQueueingMetrics(QueueingMetrics['SystemQueueingNode']):
+class SystemQueueingMetrics(QueueingMetrics):
     num_channels_history: list[int] = field(init=False, default_factory=list)
 
 
-class SystemQueueingNode(QueueingNode[Item]):
-
-    def __init__(self, metrics_type: Type[SystemQueueingMetrics] = SystemQueueingMetrics, **kwargs: Any) -> None:
-        self.metrics: SystemQueueingMetrics = None
-        super().__init__(metrics_type=metrics_type, **kwargs)
+class SystemQueueingNode(QueueingNode[Item, SystemQueueingMetrics]):
 
     def _before_add_channel_hook(self, _: Channel[Item]) -> None:
         self.metrics.num_channels_history.append(self.num_channels)
 
 
-def create_model(num_nodes: int, factory_time: float, queueing_time: float, prev_proba: float) -> Model[Item]:
+def create_model(num_nodes: int, factory_time: float, queueing_time: float,
+                 prev_proba: float) -> Model[Item, ModelMetrics[Item]]:
     num_digits = len(str(2 * num_nodes))
-    factory = FactoryNode(name=f'{1:0{num_digits}d}. Factory',
-                          delay_fn=partial(random.expovariate, lambd=1.0 / factory_time))
-    prev_node: Node[Item] = factory
+    factory = FactoryNode[NodeMetrics](name=f'{1:0{num_digits}d}_factory',
+                                       metrics=NodeMetrics(),
+                                       delay_fn=partial(random.expovariate, lambd=1.0 / factory_time))
+    prev_node: Node[Item, NodeMetrics] = factory
 
     node_idx = 2
     for idx in range(num_nodes):
-        next_node = SystemQueueingNode(name=f'{node_idx:0{num_digits}d}. Queueing',
+        next_node = SystemQueueingNode(name=f'{node_idx:0{num_digits}d}._queueing',
+                                       queue=Queue(),
                                        max_channels=1,
+                                       metrics=SystemQueueingMetrics(),
                                        delay_fn=partial(random.expovariate, lambd=1.0 / queueing_time))
         node_idx += 1
         if idx >= 1:
-            node = ProbaTransitionNode[Item](name=f'{node_idx:0{num_digits}d}. Previous vs Next')
+            node = ProbaTransitionNode[Item, NodeMetrics](name=f'{node_idx:0{num_digits}d}_previous_vs_next',
+                                                          metrics=NodeMetrics())
             node_idx += 1
             node.add_next_node(prev_node.prev_node, proba=prev_proba)
             node.add_next_node(next_node, proba=1.0 - prev_proba)
@@ -57,7 +59,7 @@ def create_model(num_nodes: int, factory_time: float, queueing_time: float, prev
             prev_node.set_next_node(next_node)
         prev_node = next_node
 
-    def num_elementary_operations(model: Model[Item]) -> float:
+    def num_elementary_operations(model: Model[Item, ModelMetrics[Item]]) -> float:
         num_channels_history = itertools.chain.from_iterable(node.metrics.num_channels_history
                                                              for node in model.nodes.values()
                                                              if isinstance(node, SystemQueueingNode))
@@ -67,13 +69,14 @@ def create_model(num_nodes: int, factory_time: float, queueing_time: float, prev
         mean_num_insert_operations = sum(num_insert_operations) / len(num_insert_operations)
         return 2 * (1 + mean_num_insert_operations)
 
-    model = Model[Item](
-        nodes=Nodes.from_node_tree_root(factory),
-        evaluations=[Evaluation[float](name='num_elementary_operations', evaluate=num_elementary_operations)])
+    model = Model(nodes=Nodes[Item].from_node_tree_root(factory),
+                  logger=CLILogger[Item](),
+                  metrics=ModelMetrics[Item](),
+                  evaluations=[Evaluation[float](name='num_elementary_operations', evaluate=num_elementary_operations)])
     return model
 
 
-def run_simulation(model: Model[Item], simulation_time: float) -> tuple[float, float]:
+def run_simulation(model: Model[Item, ModelMetrics[Item]], simulation_time: float) -> tuple[float, float]:
     start_time = time.perf_counter()
     model.simulate(end_time=simulation_time, verbosity=Verbosity.NONE)
     end_time = time.perf_counter()

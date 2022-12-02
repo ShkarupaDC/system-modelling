@@ -1,40 +1,34 @@
-import statistics
 import itertools
 from abc import abstractmethod
-from dataclasses import dataclass, field
-from typing import Type, TypeVar, Any
+from typing import Iterable, Optional, Any
 
-from qnet.common import T
-from qnet.base import Node, NodeMetrics, Item
-
-I = TypeVar('I', bound='Item')
+from .common import I, Item
+from .node import NM, Node
+from .utils import filter_none
 
 
-@dataclass(eq=False)
-class BaseFactoryMetrics(NodeMetrics[Node[T]]):
-    items: list[T] = field(init=False, default_factory=list)
+class BaseFactoryNode(Node[I, NM]):
 
-
-class BaseFactoryNode(Node[T]):
-
-    def __init__(self, metrics_type: Type[BaseFactoryMetrics[T]] = BaseFactoryMetrics, **kwargs: Any) -> None:
-        self.metrics: BaseFactoryMetrics[T] = None
-        super().__init__(metrics_type=metrics_type, **kwargs)
-        self.item: T = None
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.item: Optional[I] = None
         self.next_time = self._predict_next_time()
         self.counter = itertools.count()
 
     @property
-    def next_id(self) -> int:
-        return next(self.counter)
+    def current_items(self) -> Iterable[I]:
+        return filter_none((self.item, ))
 
-    def start_action(self, item: T) -> T:
+    @property
+    def next_id(self) -> str:
+        return f'{self.num_nodes}_{next(self.counter)}'
+
+    def start_action(self, item: I) -> None:
         super().start_action(item)
         raise RuntimeError('This method must not be called!')
 
-    def end_action(self) -> T:
+    def end_action(self) -> I:
         self.item = self._get_next_item()
-        self.metrics.items.append(self.item)
         self.next_time = self._predict_next_time()
         return self._end_action(self.item)
 
@@ -44,27 +38,11 @@ class BaseFactoryNode(Node[T]):
         self.next_time = self._predict_next_time()
 
     @abstractmethod
-    def _get_next_item(self) -> T:
+    def _get_next_item(self) -> I:
         raise NotImplementedError
 
 
-@dataclass(eq=False)
-class FactoryMetrics(BaseFactoryMetrics[I]):
-
-    @property
-    def time_per_item(self) -> dict[I, float]:
-        return {item: item.released_time - item.created_time for item in self.items if item.processed}
-
-    @property
-    def mean_time(self) -> float:
-        return statistics.mean(time_data) if (time_data := self.time_per_item.values()) else 0
-
-
-class FactoryNode(BaseFactoryNode[Item]):
-
-    def __init__(self, metrics_type: Type[FactoryMetrics[Item]] = FactoryMetrics, **kwargs: Any) -> None:
-        self.metrics: FactoryMetrics[Item] = None
-        super().__init__(metrics_type=metrics_type, **kwargs)
+class FactoryNode(BaseFactoryNode[Item, NM]):
 
     def _get_next_item(self) -> Item:
-        return Item(id=self.next_id)
+        return Item(id=self.next_id, created_time=self.current_time)

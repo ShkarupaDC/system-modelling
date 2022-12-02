@@ -17,3 +17,6 @@ __pycache__
 build/
 dist/
 *.egg-info/
+
+# Mypy
+.mypy_cache

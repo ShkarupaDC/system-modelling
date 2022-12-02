@@ -1,22 +1,27 @@
+import itertools
 from typing import Iterable, Optional, Any
 
-from qnet.common import T
-from qnet.base import Node
+from qnet.common import I
+from qnet.node import NM, Node, NodeMetrics
 from qnet.transition import BaseTransitionNode
 
 from .queueing import BankQueueingNode
 
 
-class BankTransitionNode(BaseTransitionNode[T]):
+class BankTransitionNode(BaseTransitionNode[I, NM]):
 
-    def __init__(self, first: BankQueueingNode, second: BankQueueingNode, **kwargs: Any) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
+        self.first: BankQueueingNode[I] = None
+        self.second: BankQueueingNode[I] = None
+
+    def set_next_nodes(self, first: BankQueueingNode[I], second: BankQueueingNode[I]) -> None:
         self.first = first
         self.second = second
 
     @property
-    def connected_nodes(self) -> Iterable[Node[T]]:
-        return [self.first, self.second]
+    def connected_nodes(self) -> Iterable['Node[I, NodeMetrics]']:
+        return itertools.chain((self.first, self.second), super().connected_nodes)
 
-    def _get_next_node(self, _: T) -> Optional[Node[T]]:
+    def _get_next_node(self, _: I) -> Optional[Node[I, NodeMetrics]]:
         return self.first if self.first.queuelen <= self.second.queuelen else self.second

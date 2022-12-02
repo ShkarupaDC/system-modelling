@@ -1,29 +1,34 @@
+import statistics
 from enum import Flag
 from dataclasses import dataclass, field
-from typing import Callable, Generic, Optional, Type, TypeVar
+from typing import TYPE_CHECKING, Callable, Generic, Optional, TypeVar
 
-from qnet.common import INF_TIME, TIME_EPS, T
-from qnet.base import Node, Metrics, NodeMetrics
-from qnet.factory import BaseFactoryNode
-from qnet.queueing import QueueingNode
-from qnet.logger import BaseLogger, CLILogger
+from .common import INF_TIME, TIME_EPS, T, I, Metrics, Item
+from .node import Node, NodeMetrics
+from .factory import BaseFactoryNode
+from .queueing import QueueingNode
 
-M = TypeVar('M', bound='Model')
+if TYPE_CHECKING:
+    from .logger import BaseLogger
+
+MM = TypeVar('MM', bound='ModelMetrics')
 
 
-class Nodes(dict[str, Node[T]]):
+class Nodes(dict[str, Node[I, NodeMetrics]]):
 
     @staticmethod
-    def from_node_tree_root(node_tree_root: Node[T]) -> 'Nodes[T]':
-        nodes = Nodes[T]()
+    def from_node_tree_root(node_tree_root: Node[I, NodeMetrics]) -> 'Nodes[I]':
+        nodes = Nodes[I]()
 
-        def process_node(parent: Optional[Node[T]]) -> None:
-            if parent.name in nodes and nodes[parent.name] != parent:
-                raise ValueError('Nodes must have different names')
+        def process_node(parent: Node[I, NodeMetrics]) -> None:
+            if parent.name in nodes:
+                if nodes[parent.name] == parent:
+                    return
+                else:
+                    raise ValueError('Nodes must have different names')
             nodes[parent.name] = parent
             for node in parent.connected_nodes:
-                if node is not None and node.name not in nodes:
-                    process_node(node)
+                process_node(node)
 
         process_node(node_tree_root)
         return nodes
@@ -38,19 +43,10 @@ class EvaluationReport(Generic[T]):
 @dataclass(eq=False)
 class Evaluation(Generic[T]):
     name: str
-    evaluate: Callable[['Model'], T]
+    evaluate: Callable[['Model[Item, ModelMetrics]'], T]
 
-    def __call__(self, model: 'Model') -> EvaluationReport[T]:
+    def __call__(self, model: 'Model[Item, ModelMetrics]') -> EvaluationReport[T]:
         return EvaluationReport[T](name=self.name, result=self.evaluate(model))
-
-
-@dataclass(eq=False)
-class ModelMetrics(Metrics[M]):
-    num_events: int = field(init=False, default=0)
-
-    @property
-    def mean_event_intensity(self) -> float:
-        return self.num_events / max(self.passed_time, TIME_EPS)
 
 
 class Verbosity(Flag):
@@ -59,32 +55,48 @@ class Verbosity(Flag):
     METRICS = 0b10
 
 
-class Model(Generic[T]):
+@dataclass(eq=False)
+class ModelMetrics(Metrics, Generic[I]):
+    num_events: int = field(init=False, default=0)
+    items: set[I] = field(init=False, default_factory=set)
 
-    def __init__(
-            self,
-            nodes: Nodes,
-            metrics_type: Type[ModelMetrics] = ModelMetrics,
-            evaluations: Optional[list[Evaluation]] = None,
-            logger: BaseLogger = CLILogger(),
-    ) -> None:
+    @property
+    def mean_event_intensity(self) -> float:
+        return self.num_events / max(self.passed_time, TIME_EPS)
+
+    @property
+    def time_per_item(self) -> dict[I, float]:
+        return {item: item.current_time - item.created_time for item in self.items if item.processed}
+
+    @property
+    def mean_time(self) -> float:
+        return statistics.mean(time_data) if (time_data := self.time_per_item.values()) else 0
+
+
+class Model(Generic[I, MM]):
+
+    def __init__(self,
+                 nodes: Nodes[I],
+                 logger: 'BaseLogger[I]',
+                 metrics: MM,
+                 evaluations: Optional[list[Evaluation]] = None) -> None:
         self.nodes = nodes
         self.logger = logger
-        self.metrics = metrics_type[Model[T]](self)
+        self.metrics = metrics
         self.evaluations = [] if evaluations is None else evaluations
-        self.current_time = 0
-        self.updated_nodes: list[Node[T]] = []
+        self.current_time = 0.0
+        self.collect_items()
 
     @property
     def next_time(self) -> float:
         return min(INF_TIME, *(node.next_time for node in self.nodes.values()))
 
     @property
-    def model_metrics(self) -> ModelMetrics['Model']:
+    def model_metrics(self) -> MM:
         return self.metrics
 
     @property
-    def nodes_metrics(self) -> list[NodeMetrics[Node[T]]]:
+    def nodes_metrics(self) -> list[NodeMetrics]:
         return [node.metrics for node in self.nodes.values()]
 
     @property
@@ -106,7 +118,7 @@ class Model(Generic[T]):
         while self.step(end_time):
             # Log states
             if Verbosity.STATE in verbosity:
-                self.logger.nodes_states(self.current_time, list(self.nodes.values()), self.updated_nodes)
+                self.logger.nodes_states(self.current_time, list(self.nodes.values()))
         # Log metrics
         if Verbosity.METRICS in verbosity:
             self.logger.model_metrics(self.model_metrics)
@@ -126,18 +138,24 @@ class Model(Generic[T]):
         for node in self.nodes.values():
             node.update_time(self.current_time)
         # Select nodes to be updated now
-        self.updated_nodes.clear()
+        end_action_nodes: list[Node[I, NodeMetrics]] = []
         for node in self.nodes.values():
-            if abs(new_current_time - node.next_time) <= TIME_EPS:
-                self.updated_nodes.append(node)
+            if abs(self.current_time - node.next_time) <= TIME_EPS:
+                end_action_nodes.append(node)
         # Run actions
-        for node in self.updated_nodes:
+        for node in end_action_nodes:
             node.end_action()
             self._after_node_end_action_hook(node)
+        self.collect_items()
+
+    def collect_items(self) -> None:
+        for node in self.nodes.values():
+            for item in node.current_items:
+                self.metrics.items.add(item)
 
     def _before_time_update_hook(self, time: float) -> None:
         self.metrics.passed_time += time - self.current_time
 
-    def _after_node_end_action_hook(self, node: Node[T]) -> None:
+    def _after_node_end_action_hook(self, node: Node[I, NodeMetrics]) -> None:
         if isinstance(node, (BaseFactoryNode, QueueingNode)):
             self.metrics.num_events += 1
