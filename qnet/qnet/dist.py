@@ -2,7 +2,7 @@ import random
 import math
 import bisect
 from dataclasses import dataclass
-from typing import TypeVar, Generic, Sequence, Callable
+from typing import TypeVar, Generic, Sequence, Sized, Callable, overload
 
 INF_TIME = float('inf')
 TIME_EPS = 1e-6
@@ -18,7 +18,7 @@ def erlang(lambd: float, k: int) -> float:
     return -1 / lambd * math.log(product)
 
 
-class _KeyWrapper(Generic[T, V]):
+class _KeyWrapper(Generic[T, V], Sequence[V], Sized):
 
     def __init__(self, sequence: Sequence[T], key: Callable[[T], V]) -> None:
         self.key = key
@@ -27,7 +27,17 @@ class _KeyWrapper(Generic[T, V]):
     def __len__(self) -> int:
         return len(self.sequence)
 
+    @overload
     def __getitem__(self, idx: int) -> V:
+        ...
+
+    @overload
+    def __getitem__(self, idx: slice) -> Sequence[V]:
+        ...
+
+    def __getitem__(self, idx):
+        if isinstance(idx, slice):
+            return map(self.key, self.sequence[idx])
         return self.key(self.sequence[idx])
 
 

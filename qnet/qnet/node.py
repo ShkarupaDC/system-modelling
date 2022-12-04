@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 import inspect
 from dataclasses import dataclass, field
-from typing import Callable, Generic, Iterable, Optional, TypeVar, Any
+from typing import Callable, Generic, Iterable, Optional, TypeVar, Any, cast
 
-from .common import I, Metrics, ActionRecord, ActionType
+from .common import I, SupportsDict, Metrics, ActionRecord, ActionType
 from .utils import filter_none
 
 NM = TypeVar('NM', bound='NodeMetrics')
@@ -19,8 +19,13 @@ class NodeMetrics(Metrics):
     start_action_time: float = field(init=False, default=-1)
     end_action_time: float = field(init=False, default=-1)
 
+    def to_dict(self) -> dict[str, Any]:
+        metrics_dict = super().to_dict()
+        metrics_dict.update({'num_in': self.num_in, 'num_out': self.num_out})
+        return metrics_dict
 
-class Node(ABC, Generic[I, NM]):
+
+class Node(ABC, SupportsDict, Generic[I, NM]):
     num_nodes: int = 0
 
     def __init__(self,
@@ -65,7 +70,7 @@ class Node(ABC, Generic[I, NM]):
     def set_next_node(self, node: Optional['Node[I, NodeMetrics]']) -> None:
         self.next_node = node
         if node is not None:
-            node.prev_node = self
+            node.prev_node = cast(Node[I, NodeMetrics], self)
 
     def reset_metrics(self) -> None:
         self.metrics.reset()
@@ -74,6 +79,9 @@ class Node(ABC, Generic[I, NM]):
         self.current_time = 0
         self.next_time = 0
         self.reset_metrics()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {'next_time': self.next_time}
 
     def _get_auto_name(self) -> str:
         return f'{self.__class__.__name__}{self.num_nodes}'

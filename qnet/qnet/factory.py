@@ -37,6 +37,11 @@ class BaseFactoryNode(Node[I, NM]):
         self.item = None
         self.next_time = self._predict_next_time()
 
+    def to_dict(self) -> dict[str, Any]:
+        node_dict = super().to_dict()
+        node_dict.update({'last_item': self.item, 'last_created_time': self.item.created_time if self.item else None})
+        return node_dict
+
     @abstractmethod
     def _get_next_item(self) -> I:
         raise NotImplementedError

@@ -1,10 +1,12 @@
 from collections import deque
 import heapq
 import itertools
+import inspect
 from enum import Enum
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, fields, _MISSING_TYPE
-from typing import TypeVar, Generic, Optional, Iterable, Callable, SupportsFloat, Union, Any, cast
+from typing import (TypeVar, Generic, Optional, Iterable, Callable, SupportsFloat, Protocol, Union, Any, cast,
+                    runtime_checkable)
 
 INF_TIME = float('inf')
 TIME_EPS = 1e-6
@@ -14,29 +16,38 @@ M = TypeVar('M', bound='Metrics')
 T = TypeVar('T')
 
 
+@runtime_checkable
+class SupportsDict(Protocol):
+
+    def to_dict(self) -> dict[str, Any]:
+        ...
+
+
 class ActionType(str, Enum):
     IN = 'in'
     OUT = 'out'
 
 
 @dataclass(eq=False)
-class ActionRecord(Generic[T]):
+class ActionRecord(SupportsDict, Generic[T]):
     node: T
     action_type: ActionType
     time: float
 
+    def to_dict(self) -> dict[str, Any]:
+        return {'node': self.node, 'action_type': self.action_type, 'time': self.time}
+
 
 @dataclass(eq=False)
-class Item:
+class Item(SupportsDict):
     id: str
     created_time: float = field(repr=False)
-    current_time: float = field(repr=False, default=None)
+    current_time: float = field(init=False, repr=False)
     processed: bool = field(init=False, repr=False, default=False)
     history: list[ActionRecord] = field(init=False, repr=False, default_factory=list)
 
     def __post_init__(self) -> None:
-        if self.current_time is None:
-            self.current_time = self.created_time
+        self.current_time = self.created_time
 
     @property
     def released_time(self) -> Optional[float]:
@@ -46,10 +57,21 @@ class Item:
     def time_in_system(self) -> float:
         return self.current_time - self.created_time
 
+    def to_dict(self) -> dict[str, Any]:
+        return {'id': self.id}
+
 
 @dataclass(eq=False)
-class Metrics:
+class Metrics(Protocol):
     passed_time: float = field(init=False, default=0)
+
+    def to_dict(self) -> dict[str, Any]:
+        metrics_dict = {
+            name: getattr(self, name)
+            for name, _ in inspect.getmembers(type(self),
+                                              lambda value: isinstance(value, property) and value.fget is not None)
+        }
+        return metrics_dict
 
     def reset(self) -> None:
         for param in fields(self):
@@ -62,7 +84,7 @@ class Metrics:
             setattr(self, param.name, default)
 
 
-class BoundedCollection(ABC, Generic[T]):
+class BoundedCollection(ABC, SupportsDict, Generic[T]):
 
     @abstractmethod
     def __len__(self) -> int:
@@ -102,6 +124,9 @@ class BoundedCollection(ABC, Generic[T]):
     @abstractmethod
     def pop(self) -> T:
         raise NotImplementedError
+
+    def to_dict(self) -> dict[str, Any]:
+        return {'items': list(self.data), 'max_size': self.maxlen}
 
 
 class Queue(BoundedCollection[T]):

@@ -1,9 +1,11 @@
 import statistics
 from enum import Flag
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable, Generic, Optional, TypeVar
+from typing import TYPE_CHECKING, Callable, Generic, Iterable, Optional, TypeVar, Any, cast
 
-from .common import INF_TIME, TIME_EPS, T, I, Metrics, Item
+import dill
+
+from .common import INF_TIME, TIME_EPS, T, I, Metrics
 from .node import Node, NodeMetrics
 from .factory import BaseFactoryNode
 from .queueing import QueueingNode
@@ -43,9 +45,9 @@ class EvaluationReport(Generic[T]):
 @dataclass(eq=False)
 class Evaluation(Generic[T]):
     name: str
-    evaluate: Callable[['Model[Item, ModelMetrics]'], T]
+    evaluate: Callable[['Model'], T]
 
-    def __call__(self, model: 'Model[Item, ModelMetrics]') -> EvaluationReport[T]:
+    def __call__(self, model: 'Model') -> EvaluationReport[T]:
         return EvaluationReport[T](name=self.name, result=self.evaluate(model))
 
 
@@ -65,12 +67,23 @@ class ModelMetrics(Metrics, Generic[I]):
         return self.num_events / max(self.passed_time, TIME_EPS)
 
     @property
-    def time_per_item(self) -> dict[I, float]:
-        return {item: item.current_time - item.created_time for item in self.items if item.processed}
+    def processed_items(self) -> Iterable[I]:
+        return (item for item in self.items if item.processed)
 
     @property
-    def mean_time(self) -> float:
+    def time_per_item(self) -> dict[I, float]:
+        return {item: item.time_in_system for item in self.processed_items}
+
+    @property
+    def mean_time_in_system(self) -> float:
         return statistics.mean(time_data) if (time_data := self.time_per_item.values()) else 0
+
+    def to_dict(self) -> dict[str, Any]:
+        metrics_dict = super().to_dict()
+        for metric_name in ('processed_items', 'time_per_item'):
+            metrics_dict.pop(metric_name)
+        metrics_dict['num_events'] = self.num_events
+        return metrics_dict
 
 
 class Model(Generic[I, MM]):
@@ -159,3 +172,10 @@ class Model(Generic[I, MM]):
     def _after_node_end_action_hook(self, node: Node[I, NodeMetrics]) -> None:
         if isinstance(node, (BaseFactoryNode, QueueingNode)):
             self.metrics.num_events += 1
+
+    def dumps(self) -> bytes:
+        return dill.dumps(self)
+
+    @staticmethod
+    def loads(model_bytes: bytes) -> 'Model[I, MM]':
+        return cast(Model[I, MM], dill.loads(model_bytes))

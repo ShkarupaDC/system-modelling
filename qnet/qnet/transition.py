@@ -37,6 +37,13 @@ class BaseTransitionNode(Node[I, NM]):
         self.item = None
         self.next_time = INF_TIME
 
+    def to_dict(self) -> dict[str, Any]:
+        return {'item': self.item, 'next_node': self.next_node.name if self.next_node else None}
+
+    def _before_time_update_hook(self, time: float) -> None:
+        self.next_node = None
+        super()._before_time_update_hook(time)
+
     def _process_item(self, _: I) -> None:
         pass
 
@@ -54,18 +61,24 @@ class ProbaTransitionNode(BaseTransitionNode[I, NM]):
         self.next_probas: list[float] = []
 
     @property
+    def rest_proba(self) -> float:
+        return 1 - self.proba_sum
+
+    @property
+    def num_next_nodes(self) -> int:
+        return len(self.next_nodes)
+
+    @property
     def connected_nodes(self) -> Iterable['Node[I, NodeMetrics]']:
         return itertools.chain(filter_none(self.next_nodes), super().connected_nodes)
 
     def add_next_node(self, node: Optional[Node[I, NodeMetrics]], proba: float = 1.0) -> None:
         proba_sum = self.proba_sum + proba
-        if proba_sum > 1:
-            raise RuntimeError(f'Total probability must be <= 1. Given: {proba_sum}')
+        assert proba_sum <= 1, 'Total probability must be <= 1. Given: {proba_sum}'
         self.proba_sum = proba_sum
         self.next_nodes.append(node)
         self.next_probas.append(proba)
 
     def _get_next_node(self, _: I) -> Optional[Node[I, NodeMetrics]]:
-        if self.proba_sum < 1:
-            self.add_next_node(node=None, proba=1 - self.proba_sum)
+        assert self.proba_sum == 1, 'Total probability must be equal to 1'
         return random.choices(self.next_nodes, self.next_probas, k=1)[0]
