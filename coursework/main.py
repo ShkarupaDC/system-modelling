@@ -1,9 +1,6 @@
 import random
 from functools import partial
-from typing import Union
-
-import numpy as np
-import numpy.typing as npt
+from typing import Union, Any
 
 from workshop import (CarUnit, CarUnitFactoryNode, CarUnitModelMetrics, RepairQueueingNode, AfterControlTransitionNode,
                       WorkshopCLILogger)
@@ -13,6 +10,8 @@ from qnet.dist import erlang
 from qnet.node import NodeMetrics
 from qnet.model import Evaluation, Model, Nodes, Verbosity
 from qnet.queueing import Task, ChannelPool, QueueingNode, QueueingMetrics
+
+Metrics = dict[str, Any]
 
 
 def _first_repair_priority_fn(car_unit: CarUnit) -> float:
@@ -94,8 +93,8 @@ def get_simulation_model(factory_delay_mean: float = 10.25,
     return model
 
 
-def collect_model_metrics(model: Union[bytes, Model[CarUnit, CarUnitModelMetrics]], metric_name: str, start_time: float,
-                          end_time: float, collect_step_time: float) -> npt.NDArray[np.float32]:
+def collect_metrics_over_simulation(model: Union[bytes, Model[CarUnit, CarUnitModelMetrics]], start_time: float,
+                                    end_time: float, collect_step_time: float) -> list[Metrics]:
     if isinstance(model, bytes):
         model = Model[CarUnit, CarUnitModelMetrics].loads(model)
 
@@ -104,7 +103,7 @@ def collect_model_metrics(model: Union[bytes, Model[CarUnit, CarUnitModelMetrics
     model.reset_metrics()
 
     num_steps = (end_time - start_time) // collect_step_time
-    metrics = np.empty(num_steps)
+    metrics: list[Metrics] = [None] * num_steps
     next_time, step = start_time + collect_step_time, 0
     while True:
         if model.next_time < next_time:
@@ -112,19 +111,34 @@ def collect_model_metrics(model: Union[bytes, Model[CarUnit, CarUnitModelMetrics
                 break
         else:
             model.goto(next_time, end_time)
-            metrics[step] = getattr(model.model_metrics, metric_name)
+            metrics[step] = gather_metrics_from_model(model)
             step += 1
             next_time += collect_step_time
     return metrics
 
 
-def run_simulation(model: Union[bytes, Model[CarUnit, CarUnitModelMetrics]], metric_name: str,
-                   simulation_time: float) -> float:
+def run_simulation(model: Union[bytes, Model[CarUnit, CarUnitModelMetrics]], simulation_time: float) -> Metrics:
     if isinstance(model, bytes):
         model = Model[CarUnit, CarUnitModelMetrics].loads(model)
 
     model.simulate(simulation_time, verbosity=Verbosity.NONE)
-    return getattr(model.model_metrics, metric_name)
+    return gather_metrics_from_model(model)
+
+
+def gather_metrics_from_model(model: Model[CarUnit, CarUnitModelMetrics]) -> Metrics:
+    metrics: Metrics = {}
+
+    for name, value in model.model_metrics.to_dict().items():
+        metrics[f'model__{name}'] = value
+
+    for report in model.evaluation_reports:
+        metrics[f'evaluation__{report.name}'] = report.result
+
+    for node_metrics in model.nodes_metrics:
+        for name, value in node_metrics.to_dict().items():
+            metrics[f'{node_metrics.node_name}__{name}'] = value
+
+    return metrics
 
 
 if __name__ == '__main__':
