@@ -1,11 +1,12 @@
 import random
+import itertools
 from functools import partial
-from typing import Any
+from typing import Iterable, Any
 
 from qnet.common import Item, Queue
-from qnet.node import NM, NodeMetrics
+from qnet.node import NM, Node, NodeMetrics
 from qnet.factory import FactoryNode
-from qnet.queueing import QueueingNode, QueueingMetrics
+from qnet.queueing import QueueingNode, QueueingMetrics, ChannelPool
 from qnet.logger import CLILogger
 from qnet.model import Model, Nodes, ModelMetrics
 
@@ -21,8 +22,12 @@ class BankFactoryNode(FactoryNode[NM]):
         self.cachier: ConcreteQueueingNode = None
 
     @property
+    def connected_nodes(self) -> Iterable['Node[Item, NodeMetrics]']:
+        return itertools.chain(super().connected_nodes, (self.operator, self.cachier))
+
+    @property
     def num_in_bank(self) -> float:
-        return self.operator.queuelen + self.cachier.queuelen + self.cachier.num_channels + self.operator.num_channels
+        return self.operator.queuelen + self.cachier.queuelen + self.cachier.num_tasks + self.operator.num_tasks
 
     def set_bank_nodes(self, operator: ConcreteQueueingNode, cachier: ConcreteQueueingNode) -> None:
         self.operator = operator
@@ -45,14 +50,14 @@ def run_simulation() -> None:
                                            metrics=NodeMetrics(),
                                            delay_fn=partial(random.expovariate, lambd=1.0 / 3.0))
     operator = QueueingNode[Item, QueueingMetrics](name='2_operator',
-                                                   queue=Queue(),
+                                                   queue=Queue[Item](),
                                                    metrics=QueueingMetrics(),
-                                                   max_channels=1,
+                                                   channel_pool=ChannelPool[Item](max_channels=1),
                                                    delay_fn=partial(random.uniform, a=1, b=5))
     cachier = QueueingNode[Item, QueueingMetrics](name='3_cachier',
-                                                  queue=Queue(),
+                                                  queue=Queue[Item](),
                                                   metrics=QueueingMetrics(),
-                                                  max_channels=1,
+                                                  channel_pool=ChannelPool[Item](max_channels=1),
                                                   delay_fn=partial(random.uniform, a=2, b=4))
 
     factory.set_bank_nodes(operator=operator, cachier=cachier)

@@ -9,6 +9,11 @@ from qnet.queueing import QueueingNode, QueueingMetrics
 class BankQueueingMetrics(QueueingMetrics):
     num_from_neighbor: int = field(init=False, default=0)
 
+    def to_dict(self) -> dict[str, Any]:
+        metrics_dict = super().to_dict()
+        metrics_dict['num_from_neighbor'] = self.num_from_neighbor
+        return metrics_dict
+
 
 class BankQueueingNode(QueueingNode[I, BankQueueingMetrics]):
 

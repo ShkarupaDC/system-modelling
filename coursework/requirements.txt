@@ -3,5 +3,6 @@ numpy==1.23.3
 scipy==1.9.3
 joblib==1.2.0
 pandas==1.5.2
+openpyxl==3.0.10
 matplotlib==3.6.2
 ipykernel==6.17.1

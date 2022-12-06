@@ -13,7 +13,7 @@ from matplotlib.figure import Figure
 from qnet.common import Item, Queue
 from qnet.node import Node, NodeMetrics
 from qnet.factory import FactoryNode
-from qnet.queueing import Channel, QueueingNode, QueueingMetrics
+from qnet.queueing import Task, QueueingNode, QueueingMetrics, ChannelPool
 from qnet.transition import ProbaTransitionNode
 from qnet.logger import CLILogger
 from qnet.model import Model, ModelMetrics, Nodes, Verbosity, Evaluation
@@ -23,13 +23,13 @@ ELEMENTARY_OPERATION_TIME = 1e-6  # in seconds
 
 @dataclass(eq=False)
 class SystemQueueingMetrics(QueueingMetrics):
-    num_channels_history: list[int] = field(init=False, default_factory=list)
+    num_tasks_history: list[int] = field(init=False, default_factory=list)
 
 
 class SystemQueueingNode(QueueingNode[Item, SystemQueueingMetrics]):
 
-    def _before_add_channel_hook(self, _: Channel[Item]) -> None:
-        self.metrics.num_channels_history.append(self.num_channels)
+    def _before_add_task_hook(self, _: Task[Item]) -> None:
+        self.metrics.num_tasks_history.append(self.num_tasks)
 
 
 def create_model(num_nodes: int, factory_time: float, queueing_time: float,
@@ -43,8 +43,8 @@ def create_model(num_nodes: int, factory_time: float, queueing_time: float,
     node_idx = 2
     for idx in range(num_nodes):
         next_node = SystemQueueingNode(name=f'{node_idx:0{num_digits}d}._queueing',
-                                       queue=Queue(),
-                                       max_channels=1,
+                                       queue=Queue[Item](),
+                                       channel_pool=ChannelPool[Item](max_channels=1),
                                        metrics=SystemQueueingMetrics(),
                                        delay_fn=partial(random.expovariate, lambd=1.0 / queueing_time))
         node_idx += 1
@@ -60,11 +60,11 @@ def create_model(num_nodes: int, factory_time: float, queueing_time: float,
         prev_node = next_node
 
     def num_elementary_operations(model: Model[Item, ModelMetrics[Item]]) -> float:
-        num_channels_history = itertools.chain.from_iterable(node.metrics.num_channels_history
-                                                             for node in model.nodes.values()
-                                                             if isinstance(node, SystemQueueingNode))
+        num_tasks_history = itertools.chain.from_iterable(node.metrics.num_tasks_history
+                                                          for node in model.nodes.values()
+                                                          if isinstance(node, SystemQueueingNode))
         num_insert_operations = [
-            num_channels if num_channels <= 1 else math.log2(num_channels) for num_channels in num_channels_history
+            num_tasks if num_tasks <= 1 else math.log2(num_tasks) for num_tasks in num_tasks_history
         ]
         mean_num_insert_operations = sum(num_insert_operations) / len(num_insert_operations)
         return 2 * (1 + mean_num_insert_operations)

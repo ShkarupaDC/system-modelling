@@ -1,12 +1,13 @@
 import random
 from functools import partial
 
-from src.bank import BankQueueingNode, BankQueueingMetrics, BankTransitionNode, BankCLILogger
+from src.bank import BankQueueingNode, BankQueueingMetrics, BankTransitionNode
 
 from qnet.common import Item, Queue
 from qnet.node import NodeMetrics
-from qnet.queueing import Channel
+from qnet.queueing import Task, ChannelPool
 from qnet.factory import FactoryNode
+from qnet.logger import CLILogger
 from qnet.model import Model, ModelMetrics, Nodes, Evaluation, Verbosity
 
 
@@ -19,13 +20,13 @@ def run_simulation() -> None:
                                        min_queuelen_diff=2,
                                        queue=Queue(maxlen=3),
                                        metrics=BankQueueingMetrics(),
-                                       max_channels=1,
+                                       channel_pool=ChannelPool[Item](max_channels=1),
                                        delay_fn=partial(random.expovariate, lambd=1.0 / 0.3))
     checkout2 = BankQueueingNode[Item](name='4_second_checkout',
                                        min_queuelen_diff=2,
                                        queue=Queue(maxlen=3),
                                        metrics=BankQueueingMetrics(),
-                                       max_channels=1,
+                                       channel_pool=ChannelPool[Item](max_channels=1),
                                        delay_fn=partial(random.expovariate, lambd=1.0 / 0.3))
 
     incoming_cars.set_next_node(transition)
@@ -33,12 +34,10 @@ def run_simulation() -> None:
     checkout1.set_neighbor(checkout2)
 
     # Initial conditions
-    checkout1.add_channel(
-        Channel(item=Item(id=incoming_cars.next_id, created_time=0.0),
-                next_time=random.normalvariate(mu=1.0, sigma=0.3)))
-    checkout2.add_channel(
-        Channel(item=Item(id=incoming_cars.next_id, created_time=0.0),
-                next_time=random.normalvariate(mu=1.0, sigma=0.3)))
+    checkout1.add_task(Task[Item](item=Item(id=incoming_cars.next_id, created_time=0.0),
+                                  next_time=random.normalvariate(mu=1.0, sigma=0.3)))
+    checkout2.add_task(Task[Item](item=Item(id=incoming_cars.next_id, created_time=0.0),
+                                  next_time=random.normalvariate(mu=1.0, sigma=0.3)))
     for _ in range(2):
         checkout1.queue.push(Item(id=incoming_cars.next_id, created_time=0.0))
     for _ in range(2):
@@ -56,7 +55,7 @@ def run_simulation() -> None:
     def mean_cars_in_bank(_: Model[Item, ModelMetrics]) -> float:
         metrics1 = checkout1.metrics
         metrics2 = checkout2.metrics
-        return metrics1.mean_busy_channels + metrics1.mean_queuelen + metrics2.mean_busy_channels + metrics2.mean_queuelen
+        return metrics1.mean_channels_load + metrics1.mean_queuelen + metrics2.mean_channels_load + metrics2.mean_queuelen
 
     model = Model(nodes=Nodes[Item].from_node_tree_root(incoming_cars),
                   evaluations=[
@@ -65,7 +64,7 @@ def run_simulation() -> None:
                       Evaluation[int](name='num_switched_checkout', evaluate=num_switched_checkout),
                   ],
                   metrics=ModelMetrics[Item](),
-                  logger=BankCLILogger[Item]())
+                  logger=CLILogger[Item]())
     model.simulate(end_time=10000, verbosity=Verbosity.METRICS)
 
 
